@@ -5,6 +5,7 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using Microsoft.Win32;
+using Microsoft.Web.WebView2.Core;
 using iTextSharp.text;
 using iTextSharp.text.pdf;
 using PdfTextExtractor = iTextSharp.text.pdf.parser.PdfTextExtractor;
@@ -25,6 +26,20 @@ namespace PdfEditor
         public MainWindow()
         {
             InitializeComponent();
+            InitializeWebView2();
+        }
+
+        private async void InitializeWebView2()
+        {
+            try
+            {
+                await PdfPreview.EnsureCoreWebView2Async();
+                PreviewStatus.Content = "预览就绪";
+            }
+            catch (Exception ex)
+            {
+                PreviewStatus.Content = $"初始化失败: {ex.Message}";
+            }
         }
 
         private void OpenPdf_Click(object sender, RoutedEventArgs e)
@@ -64,12 +79,22 @@ namespace PdfEditor
         {
             try
             {
-                string uriString = new Uri(filePath).AbsoluteUri;
-                PdfPreview.Navigate(uriString);
+                if (PdfPreview.CoreWebView2 != null)
+                {
+                    string escapedPath = string.Join("/", filePath.Split('\\').Select(part => Uri.EscapeDataString(part)));
+                    string uriString = "file:///" + escapedPath;
+                    PdfPreview.Source = new Uri(uriString);
+                    PreviewStatus.Content = "预览中...";
+                }
+                else
+                {
+                    PreviewStatus.Content = "WebView2 未就绪";
+                }
             }
             catch (Exception ex)
             {
                 StatusText.Text = $"预览失败: {ex.Message}";
+                PreviewStatus.Content = $"预览失败: {ex.Message}";
             }
         }
 

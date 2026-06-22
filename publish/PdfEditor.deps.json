@@ -11,6 +11,7 @@
         "dependencies": {
           "DocumentFormat.OpenXml": "3.0.2",
           "EPPlus": "5.8.10",
+          "Microsoft.Web.WebView2": "1.0.2535.41",
           "Xceed.Words.NET": "4.0.25103.5744",
           "iTextSharp": "5.5.13.3",
           "runtimepack.Microsoft.NETCore.App.Runtime.win-x64": "8.0.28",
@@ -1115,6 +1116,27 @@
           }
         }
       },
+      "Microsoft.Web.WebView2/1.0.2535.41": {
+        "runtime": {
+          "lib/netcoreapp3.0/Microsoft.Web.WebView2.Core.dll": {
+            "assemblyVersion": "1.0.2535.41",
+            "fileVersion": "1.0.2535.41"
+          },
+          "lib/netcoreapp3.0/Microsoft.Web.WebView2.WinForms.dll": {
+            "assemblyVersion": "1.0.2535.41",
+            "fileVersion": "1.0.2535.41"
+          },
+          "lib/netcoreapp3.0/Microsoft.Web.WebView2.Wpf.dll": {
+            "assemblyVersion": "1.0.2535.41",
+            "fileVersion": "1.0.2535.41"
+          }
+        },
+        "native": {
+          "runtimes/win-x64/native/WebView2Loader.dll": {
+            "fileVersion": "1.0.2535.41"
+          }
+        }
+      },
       "SkiaSharp/2.88.8": {
         "dependencies": {
           "SkiaSharp.NativeAssets.Win32": "2.88.8"
@@ -1294,6 +1316,13 @@
       "sha512": "sha512-6A0fyZkxoUUj1dpXzLAWwI89YmKZ+ZSp1DCg+gN6llcXJwfYo1IIQZoCkuo6T7vUxw/w1CSk/Pl04NQ4fno+DQ==",
       "path": "microsoft.io.recyclablememorystream/1.4.1",
       "hashPath": "microsoft.io.recyclablememorystream.1.4.1.nupkg.sha512"
+    },
+    "Microsoft.Web.WebView2/1.0.2535.41": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-E3rAxpp2GVtg99wlRBjIM5YeCXFvhPQuHGn/rfxjAJLNbKfiflliljtY/aJBkMmCzf/KmDhTTmU1hoOsEtuW+Q==",
+      "path": "microsoft.web.webview2/1.0.2535.41",
+      "hashPath": "microsoft.web.webview2.1.0.2535.41.nupkg.sha512"
     },
     "SkiaSharp/2.88.8": {
       "type": "package",

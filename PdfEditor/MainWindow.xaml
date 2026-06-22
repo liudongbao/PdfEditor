@@ -1,6 +1,7 @@
 <Window x:Class="PdfEditor.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
         Title="PDF 编辑工具" Height="800" Width="1200"
         WindowStartupLocation="CenterScreen">
     <Grid>
@@ -62,7 +63,8 @@
                     </StackPanel>
                     <StackPanel Grid.Column="1">
                         <Label Content="预览区域:" Margin="4"/>
-                        <WebBrowser x:Name="PdfPreview" Margin="4" Height="400" />
+                        <wv2:WebView2 x:Name="PdfPreview" Margin="4" Height="400" />
+                        <Label x:Name="PreviewStatus" Content="正在初始化..." Margin="4" FontSize="12" Foreground="Gray"/>
                         <Button Content="保存修改" Click="SaveEditedPdf_Click" Width="180" Margin="4"/>
                     </StackPanel>
                 </Grid>
