@@ -64,7 +64,8 @@ namespace PdfEditor
         {
             try
             {
-                PdfPreview.Navigate(new Uri(filePath));
+                string uriString = new Uri(filePath).AbsoluteUri;
+                PdfPreview.Navigate(uriString);
             }
             catch (Exception ex)
             {
