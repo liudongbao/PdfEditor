@@ -98,6 +98,21 @@ namespace PdfEditor
             }
         }
 
+        private void PageList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (PageList.SelectedItem != null && PdfPreview.CoreWebView2 != null)
+            {
+                string selectedItem = PageList.SelectedItem.ToString();
+                if (int.TryParse(selectedItem.Replace("第", "").Replace("页", "").Trim(), out int pageNumber))
+                {
+                    string escapedPath = string.Join("/", currentPdfPath.Split('\\').Select(part => Uri.EscapeDataString(part)));
+                    string uriString = "file:///" + escapedPath + "#page=" + pageNumber;
+                    PdfPreview.Source = new Uri(uriString);
+                    PreviewStatus.Content = $"预览第 {pageNumber} 页";
+                }
+            }
+        }
+
         private void AddMergeFiles_Click(object sender, RoutedEventArgs e)
         {
             OpenFileDialog openFileDialog = new OpenFileDialog();

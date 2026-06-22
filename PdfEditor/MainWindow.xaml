@@ -54,7 +54,7 @@
                     </Grid.ColumnDefinitions>
                     <StackPanel Grid.Column="0">
                         <Label Content="页面列表:" Margin="4"/>
-                        <ListBox x:Name="PageList" Margin="4" SelectionMode="Extended" Height="400"/>
+                        <ListBox x:Name="PageList" Margin="4" SelectionMode="Extended" Height="400" SelectionChanged="PageList_SelectionChanged"/>
                         <StackPanel Orientation="Horizontal" Margin="4">
                             <Button Content="删除选中" Click="DeletePages_Click"/>
                             <Button Content="上移" Click="MovePageUp_Click"/>
