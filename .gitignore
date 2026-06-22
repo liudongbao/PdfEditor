@@ -2,14 +2,9 @@
 *.suo
 *.cache
 *.pdb
-*.exe
-*.dll
-*.deps.json
-*.runtimeconfig.json
 
 bin/
 obj/
-publish/
 .vs/
 .vscode/
 .idea/
