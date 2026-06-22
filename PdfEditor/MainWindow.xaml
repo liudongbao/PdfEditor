@@ -78,6 +78,7 @@
                         <StackPanel>
                             <CheckBox x:Name="ExportWord" Content="导出为 Word (.docx)" Margin="4"/>
                             <CheckBox x:Name="ExportExcel" Content="导出为 Excel (.xlsx)" Margin="4"/>
+                            <CheckBox x:Name="ExportPpt" Content="导出为 PowerPoint (.pptx)" Margin="4"/>
                         </StackPanel>
                     </GroupBox>
                     <ProgressBar x:Name="ExportProgress" Height="20" Margin="4" Visibility="Hidden"/>

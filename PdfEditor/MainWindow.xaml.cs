@@ -10,6 +10,11 @@ using iTextSharp.text.pdf;
 using PdfTextExtractor = iTextSharp.text.pdf.parser.PdfTextExtractor;
 using OfficeOpenXml;
 using Xceed.Words.NET;
+using DocumentFormat.OpenXml;
+using DocumentFormat.OpenXml.Packaging;
+using DocumentFormat.OpenXml.Presentation;
+using P = DocumentFormat.OpenXml.Presentation;
+using D = DocumentFormat.OpenXml.Drawing;
 
 namespace PdfEditor
 {
@@ -258,7 +263,7 @@ namespace PdfEditor
                 return;
             }
 
-            if (!ExportWord.IsChecked.HasValue && !ExportExcel.IsChecked.HasValue)
+            if (!ExportWord.IsChecked.HasValue && !ExportExcel.IsChecked.HasValue && !ExportPpt.IsChecked.HasValue)
             {
                 MessageBox.Show("请至少选择一种导出格式", "提示", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
@@ -275,6 +280,11 @@ namespace PdfEditor
             if (ExportExcel.IsChecked.Value)
             {
                 ExportToExcel(Path.Combine(directory, $"{baseName}_excel.xlsx"));
+            }
+
+            if (ExportPpt.IsChecked.Value)
+            {
+                ExportToPpt(Path.Combine(directory, $"{baseName}_ppt.pptx"));
             }
         }
 
@@ -332,6 +342,89 @@ namespace PdfEditor
                     text += PdfTextExtractor.GetTextFromPage(reader, i);
                 }
                 return text;
+            }
+        }
+
+        private void ExportToPpt(string outputPath)
+        {
+            try
+            {
+                string text = ExtractTextFromPdf(ExportPdfPath.Text);
+                using (PresentationDocument presentationDocument = PresentationDocument.Create(outputPath, PresentationDocumentType.Presentation))
+                {
+                    PresentationPart presentationPart = presentationDocument.AddPresentationPart();
+                    presentationPart.Presentation = new Presentation();
+
+                    SlideMasterPart slideMasterPart = presentationPart.AddNewPart<SlideMasterPart>("rId1");
+                    slideMasterPart.SlideMaster = new SlideMaster();
+                    slideMasterPart.SlideMaster.CommonSlideData = new CommonSlideData();
+                    slideMasterPart.SlideMaster.CommonSlideData.ShapeTree = new ShapeTree();
+
+                    Shape shape = new Shape();
+                    shape.NonVisualShapeProperties = new NonVisualShapeProperties();
+                    shape.NonVisualShapeProperties.NonVisualDrawingProperties = new NonVisualDrawingProperties { Id = 1, Name = "Title" };
+                    shape.NonVisualShapeProperties.NonVisualShapeDrawingProperties = new NonVisualShapeDrawingProperties();
+                    shape.NonVisualShapeProperties.ApplicationNonVisualDrawingProperties = new ApplicationNonVisualDrawingProperties();
+                    shape.ShapeProperties = new ShapeProperties();
+                    slideMasterPart.SlideMaster.CommonSlideData.ShapeTree.Append(shape);
+
+                    SlideLayoutPart slideLayoutPart = slideMasterPart.AddNewPart<SlideLayoutPart>("rId1");
+                    slideLayoutPart.SlideLayout = new SlideLayout();
+                    slideLayoutPart.SlideLayout.CommonSlideData = new CommonSlideData();
+                    slideLayoutPart.SlideLayout.CommonSlideData.ShapeTree = new ShapeTree();
+
+                    SlidePart slidePart = presentationPart.AddNewPart<SlidePart>("rId2");
+                    slidePart.Slide = new Slide();
+                    slidePart.Slide.CommonSlideData = new CommonSlideData();
+                    slidePart.Slide.CommonSlideData.ShapeTree = new ShapeTree();
+
+                    string[] paragraphs = text.Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
+                    double top = 50;
+                    foreach (string paragraph in paragraphs.Take(50))
+                    {
+                        Shape textShape = new Shape();
+                        textShape.NonVisualShapeProperties = new NonVisualShapeProperties();
+                        textShape.NonVisualShapeProperties.NonVisualDrawingProperties = new NonVisualDrawingProperties { Id = (uint)(slidePart.Slide.CommonSlideData.ShapeTree.ChildElements.Count + 1), Name = "Text" };
+                        textShape.NonVisualShapeProperties.NonVisualShapeDrawingProperties = new NonVisualShapeDrawingProperties();
+                        textShape.NonVisualShapeProperties.ApplicationNonVisualDrawingProperties = new ApplicationNonVisualDrawingProperties();
+                        textShape.ShapeProperties = new P.ShapeProperties();
+                        textShape.ShapeProperties.Transform2D = new D.Transform2D();
+                        textShape.ShapeProperties.Transform2D.Offset = new D.Offset { X = 500000, Y = (long)(top * 9525) };
+                        textShape.ShapeProperties.Transform2D.Extents = new D.Extents { Cx = 8000000, Cy = 500000 };
+                        textShape.TextBody = new P.TextBody();
+                        textShape.TextBody.BodyProperties = new D.BodyProperties();
+                        textShape.TextBody.ListStyle = new D.ListStyle();
+                        textShape.TextBody.Append(new D.Paragraph(new D.Run(new D.Text(paragraph))));
+                        slidePart.Slide.CommonSlideData.ShapeTree.Append(textShape);
+                        top += 25;
+                        if (top > 600)
+                        {
+                            slidePart = presentationPart.AddNewPart<SlidePart>("rId" + (presentationPart.SlideParts.Count() + 1));
+                            slidePart.Slide = new Slide();
+                            slidePart.Slide.CommonSlideData = new CommonSlideData();
+                            slidePart.Slide.CommonSlideData.ShapeTree = new ShapeTree();
+                            top = 50;
+                        }
+                    }
+
+                    presentationPart.Presentation.SlideIdList = new SlideIdList();
+                    int slideIndex = 1;
+                    foreach (var slide in presentationPart.SlideParts)
+                    {
+                        SlideId slideId = new SlideId();
+                        slideId.Id = (uint)(256 + slideIndex);
+                        slideId.RelationshipId = presentationPart.GetIdOfPart(slide);
+                        presentationPart.Presentation.SlideIdList.Append(slideId);
+                        slideIndex++;
+                    }
+
+                    presentationPart.Presentation.Save();
+                }
+                MessageBox.Show($"PowerPoint 导出完成！已保存到: {outputPath}", "完成", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"PowerPoint 导出失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
