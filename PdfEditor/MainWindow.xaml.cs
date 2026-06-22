@@ -52,10 +52,23 @@ namespace PdfEditor
                     }
                 }
                 StatusText.Text = $"已打开: {Path.GetFileName(filePath)}";
+                PreviewPdf(filePath);
             }
             catch (Exception ex)
             {
                 MessageBox.Show($"打开 PDF 失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void PreviewPdf(string filePath)
+        {
+            try
+            {
+                PdfPreview.Navigate(new Uri(filePath));
+            }
+            catch (Exception ex)
+            {
+                StatusText.Text = $"预览失败: {ex.Message}";
             }
         }
 

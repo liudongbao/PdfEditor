@@ -62,7 +62,7 @@
                     </StackPanel>
                     <StackPanel Grid.Column="1">
                         <Label Content="预览区域:" Margin="4"/>
-                        <Border BorderBrush="Gray" BorderThickness="1" Margin="4" Height="400" Background="LightGray"/>
+                        <WebBrowser x:Name="PdfPreview" Margin="4" Height="400" />
                         <Button Content="保存修改" Click="SaveEditedPdf_Click" Width="180" Margin="4"/>
                     </StackPanel>
                 </Grid>
