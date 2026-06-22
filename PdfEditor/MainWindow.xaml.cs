@@ -34,11 +34,43 @@ namespace PdfEditor
             try
             {
                 await PdfPreview.EnsureCoreWebView2Async();
+                PdfPreview.CoreWebView2.SetVirtualHostNameToFolderMapping("app.local", AppDomain.CurrentDomain.BaseDirectory, CoreWebView2HostResourceAccessKind.Allow);
+                PdfPreview.CoreWebView2.NavigationCompleted += CoreWebView2_NavigationCompleted;
                 PreviewStatus.Content = "预览就绪";
             }
             catch (Exception ex)
             {
                 PreviewStatus.Content = $"初始化失败: {ex.Message}";
+            }
+        }
+
+        private int pendingPageNumber = -1;
+
+        private void CoreWebView2_NavigationCompleted(object sender, CoreWebView2NavigationCompletedEventArgs e)
+        {
+            if (!string.IsNullOrEmpty(pendingPdfData) && PdfPreview.CoreWebView2 != null)
+            {
+                Dispatcher.BeginInvoke(new Action(async () =>
+                {
+                    await System.Threading.Tasks.Task.Delay(300);
+                    try
+                    {
+                        string escapedData = pendingPdfData.Replace("\\", "\\\\").Replace("'", "\\'");
+                        string script = $"window.postMessage({{ type: 'loadPdf', base64Data: '{escapedData}' }}, '*');";
+                        await PdfPreview.CoreWebView2.ExecuteScriptAsync(script);
+                        
+                        if (pendingPageNumber > 0)
+                        {
+                            await System.Threading.Tasks.Task.Delay(500);
+                            string gotoScript = $"window.postMessage({{ type: 'gotoPage', pageNumber: {pendingPageNumber} }}, '*');";
+                            await PdfPreview.CoreWebView2.ExecuteScriptAsync(gotoScript);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        StatusText.Text = $"注入数据失败: {ex.Message}";
+                    }
+                }), System.Windows.Threading.DispatcherPriority.Background);
             }
         }
 
@@ -81,9 +113,12 @@ namespace PdfEditor
             {
                 if (PdfPreview.CoreWebView2 != null)
                 {
-                    string escapedPath = string.Join("/", filePath.Split('\\').Select(part => Uri.EscapeDataString(part)));
-                    string uriString = "file:///" + escapedPath;
-                    PdfPreview.Source = new Uri(uriString);
+                    byte[] pdfBytes = File.ReadAllBytes(filePath);
+                    string base64Pdf = Convert.ToBase64String(pdfBytes);
+                    pendingPdfData = base64Pdf;
+                    
+                    PdfPreview.Source = new Uri("https://app.local/pdfviewer.html");
+                    pendingPageNumber = 1;
                     PreviewStatus.Content = "预览中...";
                 }
                 else
@@ -98,6 +133,8 @@ namespace PdfEditor
             }
         }
 
+        private string pendingPdfData = null;
+
         private void PageList_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (PageList.SelectedItem != null && PdfPreview.CoreWebView2 != null)
@@ -105,11 +142,26 @@ namespace PdfEditor
                 string selectedItem = PageList.SelectedItem.ToString();
                 if (int.TryParse(selectedItem.Replace("第", "").Replace("页", "").Trim(), out int pageNumber))
                 {
-                    string escapedPath = string.Join("/", currentPdfPath.Split('\\').Select(part => Uri.EscapeDataString(part)));
-                    string uriString = "file:///" + escapedPath + "#page=" + pageNumber;
-                    PdfPreview.Source = new Uri(uriString);
+                    pendingPageNumber = pageNumber;
+                    NavigateToPage(pageNumber);
                     PreviewStatus.Content = $"预览第 {pageNumber} 页";
                 }
+            }
+        }
+
+        private async void NavigateToPage(int pageNumber)
+        {
+            try
+            {
+                if (PdfPreview.CoreWebView2 != null)
+                {
+                    string script = $"window.postMessage({{ type: 'gotoPage', pageNumber: {pageNumber} }}, '*');";
+                    await PdfPreview.CoreWebView2.ExecuteScriptAsync(script);
+                }
+            }
+            catch (Exception ex)
+            {
+                StatusText.Text = $"页面跳转失败: {ex.Message}";
             }
         }
 

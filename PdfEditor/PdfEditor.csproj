@@ -16,4 +16,10 @@
   <ItemGroup>
     <Resource Include="Resources\*" />
   </ItemGroup>
+
+  <ItemGroup>
+    <None Include="pdfviewer.html">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
 </Project>

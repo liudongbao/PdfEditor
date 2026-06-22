@@ -15,3 +15,6 @@ __pycache__/
 
 Thumbs.db
 .DS_Store
+
+# WebView2 缓存文件夹
+publish/PdfEditor.exe.WebView2/

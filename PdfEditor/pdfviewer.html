@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>PDF Viewer</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <style>
+        body { margin: 0; padding: 10px; background: #f0f0f0; }
+        #pdf-container { text-align: center; }
+        canvas { box-shadow: 0 2px 10px rgba(0,0,0,0.3); background: white; max-width: 100%; }
+        #loading { font-size: 18px; color: #666; margin: 20px; }
+        #page-info { margin: 10px; font-size: 14px; color: #666; }
+    </style>
+</head>
+<body>
+    <div id="loading">正在加载 PDF...</div>
+    <div id="pdf-container"></div>
+    <div id="page-info"></div>
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+        let pdfDoc = null;
+        let currentPage = 1;
+        let scale = 1.2;
+        let pendingBase64Data = null;
+
+        function setPdfData(base64Data) {
+            pendingBase64Data = base64Data;
+        }
+
+        async function loadPdfFromBase64() {
+            if (!pendingBase64Data) {
+                document.getElementById('loading').textContent = '未提供PDF数据';
+                return;
+            }
+
+            try {
+                const data = Uint8Array.from(atob(pendingBase64Data), c => c.charCodeAt(0));
+                const loadingTask = pdfjsLib.getDocument({ data: data });
+                pdfDoc = await loadingTask.promise;
+                document.getElementById('loading').textContent = `共 ${pdfDoc.numPages} 页`;
+                await renderPage(1);
+            } catch (error) {
+                document.getElementById('loading').textContent = '加载失败: ' + error.message;
+                console.error('PDF loading error:', error);
+            }
+        }
+
+        async function renderPage(pageNum) {
+            if (!pdfDoc) return;
+
+            pageNum = Math.max(1, Math.min(pageNum, pdfDoc.numPages));
+            currentPage = pageNum;
+
+            const page = await pdfDoc.getPage(pageNum);
+            const viewport = page.getViewport({ scale: scale });
+
+            const container = document.getElementById('pdf-container');
+            container.innerHTML = '';
+
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            canvas.height = viewport.height;
+            canvas.width = viewport.width;
+            
+            const maxWidth = container.clientWidth - 20;
+            if (canvas.width > maxWidth) {
+                const scaleRatio = maxWidth / canvas.width;
+                canvas.width = maxWidth;
+                canvas.height = viewport.height * scaleRatio;
+            }
+            
+            container.appendChild(canvas);
+
+            const renderContext = {
+                canvasContext: context,
+                viewport: viewport
+            };
+
+            await page.render(renderContext).promise;
+
+            document.getElementById('page-info').textContent = `第 ${pageNum} / ${pdfDoc.numPages} 页`;
+        }
+
+        window.addEventListener('message', function(e) {
+            if (e.data && e.data.type === 'gotoPage') {
+                renderPage(e.data.pageNumber);
+            } else if (e.data && e.data.type === 'loadPdf') {
+                setPdfData(e.data.base64Data);
+                loadPdfFromBase64();
+            }
+        });
+
+        window.external = {
+            getPdfData: function() {
+                return pendingBase64Data;
+            },
+            setPdfData: function(data) {
+                pendingBase64Data = data;
+                loadPdfFromBase64();
+            }
+        };
+    </script>
+</body>
+</html>
