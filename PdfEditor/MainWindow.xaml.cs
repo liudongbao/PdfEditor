@@ -4,6 +4,8 @@ using System.IO;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
+using System.Windows.Media;
 using Microsoft.Win32;
 using Microsoft.Web.WebView2.Core;
 using iTextSharp.text;
@@ -19,14 +21,29 @@ using D = DocumentFormat.OpenXml.Drawing;
 
 namespace PdfEditor
 {
+    public class BookmarkItem
+    {
+        public string Title { get; set; }
+        public int PageNumber { get; set; }
+        public string PageDisplay { get; set; }
+        public Color Color { get; set; }
+        public FontWeight FontWeight { get; set; }
+        public List<BookmarkItem> Children { get; set; } = new List<BookmarkItem>();
+    }
+
     public partial class MainWindow : Window
     {
         private string currentPdfPath;
+        private List<BookmarkItem> bookmarkItems = new List<BookmarkItem>();
+        private int currentPreviewPage = 1;
+        private int totalPages = 1;
+        private string pendingBookmarkPdfData = null;
 
         public MainWindow()
         {
             InitializeComponent();
             InitializeWebView2();
+            InitializeBookmarkPreview();
         }
 
         private async void InitializeWebView2()
@@ -41,6 +58,45 @@ namespace PdfEditor
             catch (Exception ex)
             {
                 PreviewStatus.Content = $"初始化失败: {ex.Message}";
+            }
+        }
+
+        private async void InitializeBookmarkPreview()
+        {
+            try
+            {
+                await BookmarkPreview.EnsureCoreWebView2Async();
+                BookmarkPreview.CoreWebView2.SetVirtualHostNameToFolderMapping("app.local", AppDomain.CurrentDomain.BaseDirectory, CoreWebView2HostResourceAccessKind.Allow);
+                BookmarkPreview.CoreWebView2.NavigationCompleted += BookmarkPreview_NavigationCompleted;
+            }
+            catch (Exception ex)
+            {
+                StatusText.Text = $"预览初始化失败: {ex.Message}";
+            }
+        }
+
+        private void BookmarkPreview_NavigationCompleted(object sender, CoreWebView2NavigationCompletedEventArgs e)
+        {
+            if (!string.IsNullOrEmpty(pendingBookmarkPdfData))
+            {
+                Dispatcher.BeginInvoke(new Action(async () =>
+                {
+                    await System.Threading.Tasks.Task.Delay(300);
+                    try
+                    {
+                        string escapedData = pendingBookmarkPdfData.Replace("\\", "\\\\").Replace("'", "\\'");
+                        string script = $"window.postMessage({{ type: 'loadPdf', base64Data: '{escapedData}' }}, '*');";
+                        await BookmarkPreview.CoreWebView2.ExecuteScriptAsync(script);
+
+                        if (currentPreviewPage > 1)
+                        {
+                            await System.Threading.Tasks.Task.Delay(500);
+                            string gotoScript = $"window.postMessage({{ type: 'gotoPage', pageNumber: {currentPreviewPage} }}, '*');";
+                            await BookmarkPreview.CoreWebView2.ExecuteScriptAsync(gotoScript);
+                        }
+                    }
+                    catch { }
+                }), System.Windows.Threading.DispatcherPriority.Background);
             }
         }
 
@@ -74,6 +130,48 @@ namespace PdfEditor
             }
         }
 
+        private void PreviewPdfInBookmarkWindow(string filePath)
+        {
+            try
+            {
+                if (BookmarkPreview.CoreWebView2 != null)
+                {
+                    byte[] pdfBytes = File.ReadAllBytes(filePath);
+                    string base64Pdf = Convert.ToBase64String(pdfBytes);
+                    pendingBookmarkPdfData = base64Pdf;
+                    totalPages = GetPdfPageCount(filePath);
+                    UpdateCurrentPageDisplay();
+                    
+                    BookmarkPreview.Source = new Uri("https://app.local/pdfviewer.html");
+                }
+            }
+            catch (Exception ex)
+            {
+                StatusText.Text = $"预览失败: {ex.Message}";
+            }
+        }
+
+        private int GetPdfPageCount(string filePath)
+        {
+            try
+            {
+                using (PdfReader reader = new PdfReader(filePath))
+                {
+                    return reader.NumberOfPages;
+                }
+            }
+            catch
+            {
+                return 1;
+            }
+        }
+
+        private void UpdateCurrentPageDisplay()
+        {
+            CurrentPageText.Text = $"第 {currentPreviewPage} / {totalPages} 页";
+            QuickBookmarkPage.Text = $"当前页: {currentPreviewPage}";
+        }
+
         private void OpenPdf_Click(object sender, RoutedEventArgs e)
         {
             OpenFileDialog openFileDialog = new OpenFileDialog();
@@ -88,11 +186,13 @@ namespace PdfEditor
         {
             currentPdfPath = filePath;
             PageList.Items.Clear();
+            bookmarkItems.Clear();
 
             try
             {
                 using (PdfReader reader = new PdfReader(filePath))
                 {
+                    totalPages = reader.NumberOfPages;
                     for (int i = 0; i < reader.NumberOfPages; i++)
                     {
                         PageList.Items.Add($"第 {i + 1} 页");
@@ -100,6 +200,8 @@ namespace PdfEditor
                 }
                 StatusText.Text = $"已打开: {Path.GetFileName(filePath)}";
                 PreviewPdf(filePath);
+                PreviewPdfInBookmarkWindow(filePath);
+                UpdateBookmarkTree();
             }
             catch (Exception ex)
             {
@@ -164,6 +266,407 @@ namespace PdfEditor
                 StatusText.Text = $"页面跳转失败: {ex.Message}";
             }
         }
+
+        // ==================== 书签管理功能 ====================
+
+        private void UpdateBookmarkTree()
+        {
+            BookmarkTree.ItemsSource = null;
+            BookmarkTree.ItemsSource = bookmarkItems;
+        }
+
+        private void BookmarkTree_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
+        {
+            // 书签选中时可以在此添加相关操作
+        }
+
+        private void AddBookmark_Click(object sender, RoutedEventArgs e)
+        {
+            if (string.IsNullOrEmpty(currentPdfPath))
+            {
+                MessageBox.Show("请先打开一个 PDF 文件", "提示", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            BookmarkWindow window = new BookmarkWindow();
+            window.Owner = this;
+            if (window.ShowDialog() == true)
+            {
+                var newBookmark = new BookmarkItem
+                {
+                    Title = window.TitleText,
+                    PageNumber = window.PageNumber,
+                    PageDisplay = (window.PageNumber + 1).ToString(),
+                    Color = Colors.Gray,
+                    FontWeight = FontWeights.Normal
+                };
+                bookmarkItems.Add(newBookmark);
+                bookmarkItems = bookmarkItems.OrderBy(b => b.PageNumber).ToList();
+                UpdateBookmarkTree();
+                StatusText.Text = $"已添加书签: {newBookmark.Title}";
+            }
+        }
+
+        private void AddChildBookmark_Click(object sender, RoutedEventArgs e)
+        {
+            if (string.IsNullOrEmpty(currentPdfPath))
+            {
+                MessageBox.Show("请先打开一个 PDF 文件", "提示", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            BookmarkItem parent = GetSelectedBookmarkItem();
+            if (parent == null)
+            {
+                MessageBox.Show("请先选择一个书签作为父书签", "提示", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            BookmarkWindow window = new BookmarkWindow();
+            window.Owner = this;
+            if (window.ShowDialog() == true)
+            {
+                var newBookmark = new BookmarkItem
+                {
+                    Title = window.TitleText,
+                    PageNumber = window.PageNumber,
+                    PageDisplay = (window.PageNumber + 1).ToString(),
+                    Color = Colors.Gray,
+                    FontWeight = FontWeights.Normal
+                };
+                parent.Children.Add(newBookmark);
+                UpdateBookmarkTree();
+                StatusText.Text = $"已添加子书签: {newBookmark.Title}";
+            }
+        }
+
+        private void EditBookmark_Click(object sender, RoutedEventArgs e)
+        {
+            BookmarkItem item = GetSelectedBookmarkItem();
+            if (item != null)
+            {
+                BookmarkWindow window = new BookmarkWindow(item.Title, item.PageNumber + 1);
+                window.Owner = this;
+                if (window.ShowDialog() == true)
+                {
+                    item.Title = window.TitleText;
+                    item.PageNumber = window.PageNumber;
+                    item.PageDisplay = (window.PageNumber + 1).ToString();
+                    UpdateBookmarkTree();
+                    StatusText.Text = $"已更新书签: {item.Title}";
+                }
+            }
+            else
+            {
+                MessageBox.Show("请选择要编辑的书签", "提示", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+        }
+
+        private void DeleteBookmark_Click(object sender, RoutedEventArgs e)
+        {
+            BookmarkItem item = GetSelectedBookmarkItem();
+            if (item != null)
+            {
+                RemoveBookmarkItem(bookmarkItems, item);
+                UpdateBookmarkTree();
+                StatusText.Text = $"已删除书签: {item.Title}";
+            }
+            else
+            {
+                MessageBox.Show("请选择要删除的书签", "提示", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+        }
+
+        private bool RemoveBookmarkItem(List<BookmarkItem> items, BookmarkItem target)
+        {
+            if (items.Remove(target))
+                return true;
+            
+            foreach (var item in items)
+            {
+                if (RemoveBookmarkItem(item.Children, target))
+                    return true;
+            }
+            return false;
+        }
+
+        private BookmarkItem GetSelectedBookmarkItem()
+        {
+            if (BookmarkTree.SelectedItem is BookmarkItem item)
+                return item;
+            return null;
+        }
+
+        private void SearchBookmarks_Click(object sender, RoutedEventArgs e)
+        {
+            string searchText = BookmarkSearchBox.Text.Trim().ToLower();
+            if (string.IsNullOrEmpty(searchText))
+            {
+                UpdateBookmarkTree();
+                return;
+            }
+
+            var filtered = FilterBookmarks(bookmarkItems, searchText);
+            BookmarkTree.ItemsSource = null;
+            BookmarkTree.ItemsSource = filtered;
+            StatusText.Text = $"找到 {CountBookmarks(filtered)} 个书签";
+        }
+
+        private List<BookmarkItem> FilterBookmarks(List<BookmarkItem> items, string searchText)
+        {
+            var result = new List<BookmarkItem>();
+            foreach (var item in items)
+            {
+                if (item.Title.ToLower().Contains(searchText))
+                {
+                    result.Add(item);
+                }
+                else
+                {
+                    var filteredChildren = FilterBookmarks(item.Children, searchText);
+                    if (filteredChildren.Count > 0)
+                    {
+                        var newItem = new BookmarkItem
+                        {
+                            Title = item.Title,
+                            PageNumber = item.PageNumber,
+                            PageDisplay = item.PageDisplay,
+                            Color = item.Color,
+                            FontWeight = item.FontWeight,
+                            Children = filteredChildren
+                        };
+                        result.Add(newItem);
+                    }
+                }
+            }
+            return result;
+        }
+
+        private int CountBookmarks(List<BookmarkItem> items)
+        {
+            int count = items.Count;
+            foreach (var item in items)
+            {
+                count += CountBookmarks(item.Children);
+            }
+            return count;
+        }
+
+        // 页面导航
+        private void PrevPage_Click(object sender, RoutedEventArgs e)
+        {
+            if (currentPreviewPage > 1)
+            {
+                currentPreviewPage--;
+                NavigateBookmarkPreview(currentPreviewPage);
+            }
+        }
+
+        private void NextPage_Click(object sender, RoutedEventArgs e)
+        {
+            if (currentPreviewPage < totalPages)
+            {
+                currentPreviewPage++;
+                NavigateBookmarkPreview(currentPreviewPage);
+            }
+        }
+
+        private void JumpToBookmarkPage_Click(object sender, RoutedEventArgs e)
+        {
+            BookmarkItem item = GetSelectedBookmarkItem();
+            if (item != null)
+            {
+                currentPreviewPage = item.PageNumber + 1;
+                NavigateBookmarkPreview(currentPreviewPage);
+            }
+            else
+            {
+                MessageBox.Show("请选择一个书签", "提示", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+        }
+
+        private async void NavigateBookmarkPreview(int pageNumber)
+        {
+            try
+            {
+                if (BookmarkPreview.CoreWebView2 != null)
+                {
+                    string script = $"window.postMessage({{ type: 'gotoPage', pageNumber: {pageNumber} }}, '*');";
+                    await BookmarkPreview.CoreWebView2.ExecuteScriptAsync(script);
+                    UpdateCurrentPageDisplay();
+                }
+            }
+            catch (Exception ex)
+            {
+                StatusText.Text = $"页面跳转失败: {ex.Message}";
+            }
+        }
+
+        // 快速添加书签
+        private void QuickAddBookmark_Click(object sender, RoutedEventArgs e)
+        {
+            if (string.IsNullOrEmpty(currentPdfPath))
+            {
+                MessageBox.Show("请先打开一个 PDF 文件", "提示", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            string title = QuickBookmarkTitle.Text.Trim();
+            if (string.IsNullOrEmpty(title))
+            {
+                title = $"第 {currentPreviewPage} 页";
+            }
+
+            var newBookmark = new BookmarkItem
+            {
+                Title = title,
+                PageNumber = currentPreviewPage - 1,
+                PageDisplay = currentPreviewPage.ToString(),
+                Color = Colors.Gray,
+                FontWeight = FontWeights.Normal
+            };
+            
+            bookmarkItems.Add(newBookmark);
+            bookmarkItems = bookmarkItems.OrderBy(b => b.PageNumber).ToList();
+            UpdateBookmarkTree();
+            QuickBookmarkTitle.Text = "";
+            StatusText.Text = $"已添加书签: {newBookmark.Title}";
+        }
+
+        // 批量添加连续页面为书签
+        private void BatchAddBookmarks_Click(object sender, RoutedEventArgs e)
+        {
+            if (string.IsNullOrEmpty(currentPdfPath))
+            {
+                MessageBox.Show("请先打开一个 PDF 文件", "提示", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            BatchBookmarkWindow window = new BatchBookmarkWindow();
+            window.Owner = this;
+            if (window.ShowDialog() == true)
+            {
+                int startPage = window.StartPage;
+                int endPage = window.EndPage;
+                string titlePrefix = window.TitlePrefix;
+
+                for (int i = startPage; i <= endPage; i++)
+                {
+                    var newBookmark = new BookmarkItem
+                    {
+                        Title = $"{titlePrefix} {i}",
+                        PageNumber = i - 1,
+                        PageDisplay = i.ToString(),
+                        Color = Colors.Gray,
+                        FontWeight = FontWeights.Normal
+                    };
+                    bookmarkItems.Add(newBookmark);
+                }
+                
+                bookmarkItems = bookmarkItems.OrderBy(b => b.PageNumber).ToList();
+                UpdateBookmarkTree();
+                StatusText.Text = $"已批量添加书签: 第 {startPage}-{endPage} 页";
+            }
+        }
+
+        // 应用书签样式
+        private void ApplyBookmarkStyle_Click(object sender, RoutedEventArgs e)
+        {
+            BookmarkItem item = GetSelectedBookmarkItem();
+            if (item == null)
+            {
+                MessageBox.Show("请选择要设置样式的书签", "提示", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            var selectedColor = (BookmarkColorCombo.SelectedItem as ComboBoxItem);
+            if (selectedColor != null)
+            {
+                string colorHex = selectedColor.Tag.ToString();
+                item.Color = (Color)ColorConverter.ConvertFromString(colorHex);
+            }
+
+            item.FontWeight = BookmarkBoldCheck.IsChecked == true ? FontWeights.Bold : FontWeights.Normal;
+            UpdateBookmarkTree();
+            StatusText.Text = $"已更新书签样式: {item.Title}";
+        }
+
+        // 拖拽排序
+        private Point dragStartPoint;
+        private BookmarkItem dragItem;
+
+        private void BookmarkTree_MouseMove(object sender, MouseEventArgs e)
+        {
+            if (e.LeftButton == MouseButtonState.Pressed)
+            {
+                dragItem = GetSelectedBookmarkItem();
+                if (dragItem != null)
+                {
+                    DragDrop.DoDragDrop(BookmarkTree, dragItem, DragDropEffects.Move);
+                }
+            }
+        }
+
+        private void BookmarkTree_DragOver(object sender, DragEventArgs e)
+        {
+            if (e.Data.GetDataPresent(typeof(BookmarkItem)))
+            {
+                e.Effects = DragDropEffects.Move;
+            }
+            else
+            {
+                e.Effects = DragDropEffects.None;
+            }
+            e.Handled = true;
+        }
+
+        private void BookmarkTree_Drop(object sender, DragEventArgs e)
+        {
+            if (e.Data.GetDataPresent(typeof(BookmarkItem)))
+            {
+                BookmarkItem droppedItem = e.Data.GetData(typeof(BookmarkItem)) as BookmarkItem;
+                
+                // 获取目标位置
+                var target = BookmarkTree.SelectedItem as BookmarkItem;
+                if (target != null && target != droppedItem)
+                {
+                    // 从原位置移除
+                    RemoveBookmarkItem(bookmarkItems, droppedItem);
+                    
+                    // 添加到新位置（作为同级书签，在目标之后）
+                    int index = bookmarkItems.IndexOf(target);
+                    if (index >= 0)
+                    {
+                        bookmarkItems.Insert(index + 1, droppedItem);
+                    }
+                    else
+                    {
+                        // 尝试在子节点中查找位置
+                        InsertAfterItem(bookmarkItems, target, droppedItem);
+                    }
+                    
+                    UpdateBookmarkTree();
+                    StatusText.Text = $"已移动书签: {droppedItem.Title}";
+                }
+            }
+        }
+
+        private bool InsertAfterItem(List<BookmarkItem> items, BookmarkItem target, BookmarkItem newItem)
+        {
+            for (int i = 0; i < items.Count; i++)
+            {
+                if (items[i] == target)
+                {
+                    items.Insert(i + 1, newItem);
+                    return true;
+                }
+                if (InsertAfterItem(items[i].Children, target, newItem))
+                    return true;
+            }
+            return false;
+        }
+
+        // ==================== 其他功能 ====================
 
         private void AddMergeFiles_Click(object sender, RoutedEventArgs e)
         {
@@ -534,47 +1037,6 @@ namespace PdfEditor
             }
         }
 
-        private void AddBookmark_Click(object sender, RoutedEventArgs e)
-        {
-            BookmarkWindow window = new BookmarkWindow();
-            if (window.ShowDialog() == true)
-            {
-                TreeViewItem item = new TreeViewItem();
-                item.Header = window.TitleText;
-                item.Tag = window.PageNumber;
-                BookmarkTree.Items.Add(item);
-            }
-        }
-
-        private void EditBookmark_Click(object sender, RoutedEventArgs e)
-        {
-            if (BookmarkTree.SelectedItem is TreeViewItem selectedItem)
-            {
-                BookmarkWindow window = new BookmarkWindow((string)selectedItem.Header, (int)selectedItem.Tag);
-                if (window.ShowDialog() == true)
-                {
-                    selectedItem.Header = window.TitleText;
-                    selectedItem.Tag = window.PageNumber;
-                }
-            }
-            else
-            {
-                MessageBox.Show("请选择要编辑的书签", "提示", MessageBoxButton.OK, MessageBoxImage.Information);
-            }
-        }
-
-        private void DeleteBookmark_Click(object sender, RoutedEventArgs e)
-        {
-            if (BookmarkTree.SelectedItem is TreeViewItem selectedItem)
-            {
-                BookmarkTree.Items.Remove(selectedItem);
-            }
-            else
-            {
-                MessageBox.Show("请选择要删除的书签", "提示", MessageBoxButton.OK, MessageBoxImage.Information);
-            }
-        }
-
         private void SaveBookmarks_Click(object sender, RoutedEventArgs e)
         {
             if (string.IsNullOrEmpty(currentPdfPath))
@@ -594,7 +1056,7 @@ namespace PdfEditor
                         using (FileStream fs = new FileStream(saveFileDialog.FileName, FileMode.Create))
                         {
                             PdfStamper stamper = new PdfStamper(reader, fs);
-                            AddBookmarksToPdf(stamper, BookmarkTree.Items, null);
+                            AddBookmarksToPdf(stamper, bookmarkItems, null);
                             stamper.Close();
                         }
                     }
@@ -608,18 +1070,18 @@ namespace PdfEditor
             }
         }
 
-        private void AddBookmarksToPdf(PdfStamper stamper, ItemCollection items, PdfOutline parent)
+        private void AddBookmarksToPdf(PdfStamper stamper, List<BookmarkItem> items, PdfOutline parent)
         {
-            foreach (TreeViewItem item in items)
+            foreach (BookmarkItem item in items)
             {
-                string title = (string)item.Header;
-                int pageNum = (int)item.Tag;
+                string title = item.Title;
+                int pageNum = item.PageNumber;
                 PdfDestination dest = new PdfDestination(PdfDestination.FIT);
                 dest.AddPage(stamper.Writer.GetImportedPage(new PdfReader(currentPdfPath), pageNum + 1).IndirectReference);
                 PdfOutline outline = new PdfOutline(parent, dest, title);
-                if (item.Items.Count > 0)
+                if (item.Children.Count > 0)
                 {
-                    AddBookmarksToPdf(stamper, item.Items, outline);
+                    AddBookmarksToPdf(stamper, item.Children, outline);
                 }
             }
         }
@@ -631,7 +1093,7 @@ namespace PdfEditor
 
         private void About_Click(object sender, RoutedEventArgs e)
         {
-            MessageBox.Show("PDF 编辑工具 v1.0\n\n一款功能强大的 PDF 处理工具，支持合并、编辑、导出等功能。", "关于", MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show("PDF 编辑工具 v1.1\n\n一款功能强大的 PDF 处理工具，支持合并、编辑、导出、可视化书签管理等功能。", "关于", MessageBoxButton.OK, MessageBoxImage.Information);
         }
 
         private void MainTabControl_SelectionChanged(object sender, SelectionChangedEventArgs e)

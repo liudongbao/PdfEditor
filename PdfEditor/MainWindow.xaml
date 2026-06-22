@@ -89,15 +89,122 @@
             </TabItem>
 
             <TabItem Header="目录管理">
-                <StackPanel Margin="4">
-                    <TreeView x:Name="BookmarkTree" Margin="4" Height="400"/>
-                    <StackPanel Orientation="Horizontal" Margin="4">
-                        <Button Content="添加书签" Click="AddBookmark_Click"/>
-                        <Button Content="编辑书签" Click="EditBookmark_Click"/>
-                        <Button Content="删除书签" Click="DeleteBookmark_Click"/>
-                    </StackPanel>
-                    <Button Content="保存目录到 PDF" Click="SaveBookmarks_Click" Width="200" Margin="4"/>
-                </StackPanel>
+                <Grid Margin="4">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="350"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- 左侧：书签列表 -->
+                    <Border Grid.Column="0" BorderBrush="LightGray" BorderThickness="1" Margin="2">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <!-- 标题和搜索 -->
+                            <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="4">
+                                <TextBlock Text="书签目录" FontSize="16" FontWeight="Bold" VerticalAlignment="Center"/>
+                                <Button Content="搜索" Click="SearchBookmarks_Click" Margin="10,0,0,0" Width="60"/>
+                            </StackPanel>
+
+                            <TextBox x:Name="BookmarkSearchBox" Grid.Row="1" Margin="4" Width="330"
+                                     VerticalContentAlignment="Center" ToolTip="搜索书签..."/>
+
+                            <!-- 书签树 -->
+                            <TreeView x:Name="BookmarkTree" Grid.Row="2" Margin="4"
+                                      SelectedItemChanged="BookmarkTree_SelectedItemChanged"
+                                      AllowDrop="True"
+                                      MouseMove="BookmarkTree_MouseMove"
+                                      Drop="BookmarkTree_Drop"
+                                      DragOver="BookmarkTree_DragOver">
+                                <TreeView.ItemContainerStyle>
+                                    <Style TargetType="TreeViewItem">
+                                        <Setter Property="IsExpanded" Value="True"/>
+                                    </Style>
+                                </TreeView.ItemContainerStyle>
+                                <TreeView.ItemTemplate>
+                                    <HierarchicalDataTemplate ItemsSource="{Binding Children}">
+                                        <StackPanel Orientation="Horizontal">
+                                            <Rectangle Width="12" Height="12" Margin="0,0,6,0">
+                                                <Rectangle.Fill>
+                                                    <SolidColorBrush Color="{Binding Color}"/>
+                                                </Rectangle.Fill>
+                                            </Rectangle>
+                                            <TextBlock Text="{Binding Title}" FontWeight="{Binding FontWeight}"/>
+                                            <TextBlock Text=" - 第" Foreground="Gray" Margin="8,0,0,0"/>
+                                            <TextBlock Text="{Binding PageDisplay}" Foreground="Gray"/>
+                                            <TextBlock Text="页" Foreground="Gray"/>
+                                        </StackPanel>
+                                    </HierarchicalDataTemplate>
+                                </TreeView.ItemTemplate>
+                            </TreeView>
+
+                            <!-- 书签操作按钮 -->
+                            <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="4">
+                                <Button Content="添加书签" Click="AddBookmark_Click" Width="80"/>
+                                <Button Content="添加子书签" Click="AddChildBookmark_Click" Width="90" Margin="4,0"/>
+                                <Button Content="编辑" Click="EditBookmark_Click" Width="60"/>
+                                <Button Content="删除" Click="DeleteBookmark_Click" Width="60" Margin="4,0"/>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <!-- 右侧：PDF 预览和页面导航 -->
+                    <Border Grid.Column="1" BorderBrush="LightGray" BorderThickness="1" Margin="2">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <!-- 页面导航 -->
+                            <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="4">
+                                <Button Content="&lt; 上一页" Click="PrevPage_Click" Width="80"/>
+                                <TextBlock x:Name="CurrentPageText" Text="第 1 / 1 页"
+                                           VerticalAlignment="Center" Margin="10,0" FontSize="14"/>
+                                <Button Content="下一页 &gt;" Click="NextPage_Click" Width="80"/>
+                                <Button Content="跳转到书签页" Click="JumpToBookmarkPage_Click" Width="100" Margin="20,0,0,0"/>
+                            </StackPanel>
+
+                            <!-- 快速添加书签 -->
+                            <Border Grid.Row="1" Background="LightYellow" Padding="4" Margin="4">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="快速添加书签：" VerticalAlignment="Center"/>
+                                    <TextBox x:Name="QuickBookmarkTitle" Width="200" Margin="4,0"
+                                             VerticalContentAlignment="Center" ToolTip="输入书签标题"/>
+                                    <TextBlock x:Name="QuickBookmarkPage" Text="当前页: 1"
+                                               VerticalAlignment="Center" Margin="4,0"/>
+                                    <Button Content="添加到当前页" Click="QuickAddBookmark_Click" Width="100"/>
+                                    <Button Content="批量添加连续页" Click="BatchAddBookmarks_Click" Width="110" Margin="4,0"/>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- PDF 预览 -->
+                            <wv2:WebView2 x:Name="BookmarkPreview" Grid.Row="2" Margin="4"/>
+
+                            <!-- 书签颜色设置 -->
+                            <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="4">
+                                <TextBlock Text="书签颜色:" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                                <ComboBox x:Name="BookmarkColorCombo" Width="120" SelectedIndex="0">
+                                    <ComboBoxItem Content="红色" Tag="#FF0000"/>
+                                    <ComboBoxItem Content="蓝色" Tag="#0000FF"/>
+                                    <ComboBoxItem Content="绿色" Tag="#00AA00"/>
+                                    <ComboBoxItem Content="黄色" Tag="#FFCC00"/>
+                                    <ComboBoxItem Content="紫色" Tag="#9900FF"/>
+                                    <ComboBoxItem Content="默认" Tag="#666666"/>
+                                </ComboBox>
+                                <CheckBox x:Name="BookmarkBoldCheck" Content="加粗" Margin="10,0"/>
+                                <Button Content="应用样式" Click="ApplyBookmarkStyle_Click" Margin="10,0"/>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+                </Grid>
             </TabItem>
         </TabControl>
 

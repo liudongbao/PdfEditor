@@ -18,3 +18,6 @@ Thumbs.db
 
 # WebView2 缓存文件夹
 publish/PdfEditor.exe.WebView2/
+
+# 自包含发布依赖
+publish/runtimes/
