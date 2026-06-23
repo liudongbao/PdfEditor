@@ -189,20 +189,20 @@ namespace PdfEditor
 
             try
             {
-                using (PdfReader reader = new PdfReader(filePath))
+                using (PdfWrapper.PdfDocument pdfDoc = new PdfWrapper.PdfDocument(filePath))
                 {
-                    totalPages = reader.NumberOfPages;
-                    for (int i = 0; i < reader.NumberOfPages; i++)
+                    totalPages = pdfDoc.GetPageCount();
+                    for (int i = 0; i < totalPages; i++)
                     {
                         PageList.Items.Add($"第 {i + 1} 页");
                     }
                     
-                    IList<Dictionary<string, object>> outlines = SimpleBookmark.GetBookmark(reader);
+                    var outlines = pdfDoc.GetBookmarks();
                     if (outlines != null)
                     {
                         foreach (var outline in outlines)
                         {
-                            BookmarkItem item = ParseBookmarkItem(outline);
+                            BookmarkItem item = ConvertToBookmarkItem(outline);
                             if (item != null)
                             {
                                 bookmarkItems.Add(item);
@@ -221,31 +221,19 @@ namespace PdfEditor
             }
         }
 
-        private BookmarkItem ParseBookmarkItem(Dictionary<string, object> bookmarkDict)
+        private BookmarkItem ConvertToBookmarkItem(PdfWrapper.PdfBookmark pdfBookmark)
         {
+            if (pdfBookmark == null) return null;
+            
             BookmarkItem item = new BookmarkItem();
+            item.Title = pdfBookmark.Title;
+            item.PageNumber = pdfBookmark.PageNumber;
             
-            if (bookmarkDict.ContainsKey("Title"))
+            if (pdfBookmark.Children != null)
             {
-                item.Title = bookmarkDict["Title"].ToString();
-            }
-            
-            if (bookmarkDict.ContainsKey("Page"))
-            {
-                string pageStr = bookmarkDict["Page"].ToString();
-                int pageNum = 1;
-                if (int.TryParse(pageStr.Split(' ')[0], out pageNum))
+                foreach (var child in pdfBookmark.Children)
                 {
-                    item.PageNumber = pageNum - 1;
-                }
-            }
-            
-            if (bookmarkDict.ContainsKey("Kids"))
-            {
-                IList<Dictionary<string, object>> kids = (IList<Dictionary<string, object>>)bookmarkDict["Kids"];
-                foreach (var kid in kids)
-                {
-                    BookmarkItem childItem = ParseBookmarkItem(kid);
+                    BookmarkItem childItem = ConvertToBookmarkItem(child);
                     if (childItem != null)
                     {
                         item.Children.Add(childItem);
@@ -1156,18 +1144,18 @@ namespace PdfEditor
             {
                 try
                 {
-                    using (FileStream fs = new FileStream(saveFileDialog.FileName, FileMode.Create))
+                    using (PdfWrapper.PdfDocument pdfDoc = new PdfWrapper.PdfDocument(currentPdfPath))
                     {
-                        PdfReader reader = new PdfReader(currentPdfPath);
-                        PdfStamper stamper = new PdfStamper(reader, fs);
-                        
                         foreach (var item in bookmarkItems)
                         {
-                            AddBookmarkToPdf(stamper.Writer, item, null);
+                            PdfWrapper.PdfBookmark bookmark = ConvertToPdfBookmark(item);
+                            if (bookmark != null)
+                            {
+                                pdfDoc.AddBookmark(bookmark);
+                            }
                         }
                         
-                        stamper.Close();
-                        reader.Close();
+                        pdfDoc.Save(saveFileDialog.FileName);
                     }
 
                     MessageBox.Show($"目录已保存到: {saveFileDialog.FileName}", "完成", MessageBoxButton.OK, MessageBoxImage.Information);
@@ -1179,21 +1167,27 @@ namespace PdfEditor
             }
         }
 
-        private void AddBookmarkToPdf(PdfWriter writer, BookmarkItem item, PdfOutline parent)
+        private PdfWrapper.PdfBookmark ConvertToPdfBookmark(BookmarkItem item)
         {
-            int pageNum = item.PageNumber + 1;
+            if (item == null) return null;
             
-            PdfAction action = PdfAction.GotoLocalPage(pageNum, new PdfDestination(PdfDestination.FIT), writer);
-            
-            PdfOutline outline = new PdfOutline(parent, action, item.Title);
+            PdfWrapper.PdfBookmark bookmark = new PdfWrapper.PdfBookmark();
+            bookmark.Title = item.Title;
+            bookmark.PageNumber = item.PageNumber;
             
             if (item.Children != null && item.Children.Count > 0)
             {
                 foreach (var child in item.Children)
                 {
-                    AddBookmarkToPdf(writer, child, outline);
+                    PdfWrapper.PdfBookmark childBookmark = ConvertToPdfBookmark(child);
+                    if (childBookmark != null)
+                    {
+                        bookmark.Children.Add(childBookmark);
+                    }
                 }
             }
+            
+            return bookmark;
         }
 
         

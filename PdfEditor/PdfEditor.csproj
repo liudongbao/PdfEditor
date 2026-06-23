@@ -1,8 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net8.0-windows</TargetFramework>
+    <TargetFramework>net9.0-windows</TargetFramework>
     <UseWPF>true</UseWPF>
+    <Platforms>x64</Platforms>
   </PropertyGroup>
 
   <ItemGroup>
@@ -15,6 +16,13 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Reference Include="PdfWrapper">
+      <HintPath>..\PdfWrapper\bin\Release\x64\PdfWrapper.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
     <Resource Include="Resources\*" />
   </ItemGroup>
 
@@ -23,4 +31,11 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
+
+  <Target Name="CopyPdfWrapperDependencies" AfterTargets="Build">
+    <ItemGroup>
+      <PdfWrapperDlls Include="..\PdfWrapper\bin\Release\x64\*.dll" />
+    </ItemGroup>
+    <Copy SourceFiles="@(PdfWrapperDlls)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+  </Target>
 </Project>
