@@ -10,7 +10,7 @@ using Microsoft.Win32;
 using Microsoft.Web.WebView2.Core;
 using iTextSharp.text;
 using iTextSharp.text.pdf;
-using PdfTextExtractor = iTextSharp.text.pdf.parser.PdfTextExtractor;
+using iTextSharp.text.pdf.draw;
 using OfficeOpenXml;
 using Xceed.Words.NET;
 using DocumentFormat.OpenXml;
@@ -169,7 +169,6 @@ namespace PdfEditor
         private void UpdateCurrentPageDisplay()
         {
             CurrentPageText.Text = $"第 {currentPreviewPage} / {totalPages} 页";
-            QuickBookmarkPage.Text = $"当前页: {currentPreviewPage}";
         }
 
         private void OpenPdf_Click(object sender, RoutedEventArgs e)
@@ -197,6 +196,19 @@ namespace PdfEditor
                     {
                         PageList.Items.Add($"第 {i + 1} 页");
                     }
+                    
+                    IList<Dictionary<string, object>> outlines = SimpleBookmark.GetBookmark(reader);
+                    if (outlines != null)
+                    {
+                        foreach (var outline in outlines)
+                        {
+                            BookmarkItem item = ParseBookmarkItem(outline);
+                            if (item != null)
+                            {
+                                bookmarkItems.Add(item);
+                            }
+                        }
+                    }
                 }
                 StatusText.Text = $"已打开: {Path.GetFileName(filePath)}";
                 PreviewPdf(filePath);
@@ -207,6 +219,41 @@ namespace PdfEditor
             {
                 MessageBox.Show($"打开 PDF 失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
             }
+        }
+
+        private BookmarkItem ParseBookmarkItem(Dictionary<string, object> bookmarkDict)
+        {
+            BookmarkItem item = new BookmarkItem();
+            
+            if (bookmarkDict.ContainsKey("Title"))
+            {
+                item.Title = bookmarkDict["Title"].ToString();
+            }
+            
+            if (bookmarkDict.ContainsKey("Page"))
+            {
+                string pageStr = bookmarkDict["Page"].ToString();
+                int pageNum = 1;
+                if (int.TryParse(pageStr.Split(' ')[0], out pageNum))
+                {
+                    item.PageNumber = pageNum - 1;
+                }
+            }
+            
+            if (bookmarkDict.ContainsKey("Kids"))
+            {
+                IList<Dictionary<string, object>> kids = (IList<Dictionary<string, object>>)bookmarkDict["Kids"];
+                foreach (var kid in kids)
+                {
+                    BookmarkItem childItem = ParseBookmarkItem(kid);
+                    if (childItem != null)
+                    {
+                        item.Children.Add(childItem);
+                    }
+                }
+            }
+            
+            return item;
         }
 
         private void PreviewPdf(string filePath)
@@ -269,6 +316,57 @@ namespace PdfEditor
 
         // ==================== 书签管理功能 ====================
 
+        private BookmarkItem ParseBookmarkDict(Dictionary<string, object> dict)
+        {
+            if (!dict.ContainsKey("Title"))
+                return null;
+
+            BookmarkItem item = new BookmarkItem();
+            item.Title = dict["Title"].ToString();
+
+            if (dict.ContainsKey("Page"))
+            {
+                string pageStr = dict["Page"].ToString();
+                int pageNum = ParsePageNumber(pageStr);
+                item.PageNumber = pageNum;
+            }
+            else
+            {
+                item.PageNumber = 0;
+            }
+
+            if (dict.ContainsKey("Kids") && dict["Kids"] is IList<object> kids)
+            {
+                foreach (var kidObj in kids)
+                {
+                    if (kidObj is Dictionary<string, object> kidDict)
+                    {
+                        BookmarkItem child = ParseBookmarkDict(kidDict);
+                        if (child != null)
+                        {
+                            item.Children.Add(child);
+                        }
+                    }
+                }
+            }
+
+            return item;
+        }
+
+        private int ParsePageNumber(string pageStr)
+        {
+            try
+            {
+                string[] parts = pageStr.Split(new[] { ' ', '[', ']', '/' }, StringSplitOptions.RemoveEmptyEntries);
+                if (parts.Length > 0 && int.TryParse(parts[0], out int pageNum))
+                {
+                    return pageNum - 1;
+                }
+            }
+            catch { }
+            return 0;
+        }
+
         private void UpdateBookmarkTree()
         {
             BookmarkTree.ItemsSource = null;
@@ -277,7 +375,13 @@ namespace PdfEditor
 
         private void BookmarkTree_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
         {
-            // 书签选中时可以在此添加相关操作
+            BookmarkItem item = GetSelectedBookmarkItem();
+            if (item != null)
+            {
+                currentPreviewPage = item.PageNumber + 1;
+                NavigateBookmarkPreview(currentPreviewPage);
+                StatusText.Text = $"已跳转到: {item.Title}";
+            }
         }
 
         private void AddBookmark_Click(object sender, RoutedEventArgs e)
@@ -826,23 +930,23 @@ namespace PdfEditor
             {
                 try
                 {
-                    using (PdfReader reader = new PdfReader(currentPdfPath))
+                    using (FileStream fs = new FileStream(saveFileDialog.FileName, FileMode.Create))
                     {
-                        using (FileStream fs = new FileStream(saveFileDialog.FileName, FileMode.Create))
-                        {
-                            Document document = new Document();
-                            PdfCopy copy = new PdfCopy(document, fs);
-                            document.Open();
+                        Document document = new Document();
+                        PdfCopy copy = new PdfCopy(document, fs);
+                        document.Open();
 
+                        using (PdfReader reader = new PdfReader(currentPdfPath))
+                        {
                             foreach (var item in PageList.Items)
                             {
                                 string pageText = item.ToString();
-                                int pageNum = int.Parse(pageText.Split('第', '页')[1].Trim()) - 1;
-                                copy.AddPage(copy.GetImportedPage(reader, pageNum + 1));
+                                int pageNum = int.Parse(pageText.Split('第', '页')[1].Trim());
+                                copy.AddPage(copy.GetImportedPage(reader, pageNum));
                             }
-
-                            document.Close();
                         }
+
+                        document.Close();
                     }
 
                     MessageBox.Show($"已保存到: {saveFileDialog.FileName}", "完成", MessageBoxButton.OK, MessageBoxImage.Information);
@@ -948,7 +1052,7 @@ namespace PdfEditor
                 string text = "";
                 for (int i = 1; i <= reader.NumberOfPages; i++)
                 {
-                    text += PdfTextExtractor.GetTextFromPage(reader, i);
+                    text += iTextSharp.text.pdf.parser.PdfTextExtractor.GetTextFromPage(reader, i);
                 }
                 return text;
             }
@@ -1047,18 +1151,23 @@ namespace PdfEditor
 
             SaveFileDialog saveFileDialog = new SaveFileDialog();
             saveFileDialog.Filter = "PDF 文件 (*.pdf)|*.pdf";
+            saveFileDialog.InitialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
             if (saveFileDialog.ShowDialog() == true)
             {
                 try
                 {
-                    using (PdfReader reader = new PdfReader(currentPdfPath))
+                    using (FileStream fs = new FileStream(saveFileDialog.FileName, FileMode.Create))
                     {
-                        using (FileStream fs = new FileStream(saveFileDialog.FileName, FileMode.Create))
+                        PdfReader reader = new PdfReader(currentPdfPath);
+                        PdfStamper stamper = new PdfStamper(reader, fs);
+                        
+                        foreach (var item in bookmarkItems)
                         {
-                            PdfStamper stamper = new PdfStamper(reader, fs);
-                            AddBookmarksToPdf(stamper, bookmarkItems, null);
-                            stamper.Close();
+                            AddBookmarkToPdf(stamper.Writer, item, null);
                         }
+                        
+                        stamper.Close();
+                        reader.Close();
                     }
 
                     MessageBox.Show($"目录已保存到: {saveFileDialog.FileName}", "完成", MessageBoxButton.OK, MessageBoxImage.Information);
@@ -1070,21 +1179,24 @@ namespace PdfEditor
             }
         }
 
-        private void AddBookmarksToPdf(PdfStamper stamper, List<BookmarkItem> items, PdfOutline parent)
+        private void AddBookmarkToPdf(PdfWriter writer, BookmarkItem item, PdfOutline parent)
         {
-            foreach (BookmarkItem item in items)
+            int pageNum = item.PageNumber + 1;
+            
+            PdfAction action = PdfAction.GotoLocalPage(pageNum, new PdfDestination(PdfDestination.FIT), writer);
+            
+            PdfOutline outline = new PdfOutline(parent, action, item.Title);
+            
+            if (item.Children != null && item.Children.Count > 0)
             {
-                string title = item.Title;
-                int pageNum = item.PageNumber;
-                PdfDestination dest = new PdfDestination(PdfDestination.FIT);
-                dest.AddPage(stamper.Writer.GetImportedPage(new PdfReader(currentPdfPath), pageNum + 1).IndirectReference);
-                PdfOutline outline = new PdfOutline(parent, dest, title);
-                if (item.Children.Count > 0)
+                foreach (var child in item.Children)
                 {
-                    AddBookmarksToPdf(stamper, item.Children, outline);
+                    AddBookmarkToPdf(writer, child, outline);
                 }
             }
         }
+
+        
 
         private void Exit_Click(object sender, RoutedEventArgs e)
         {
@@ -1098,6 +1210,53 @@ namespace PdfEditor
 
         private void MainTabControl_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
+        }
+
+        private void ShowBookmarkMenu_Click(object sender, RoutedEventArgs e)
+        {
+            // 显示书签操作菜单
+            ContextMenu menu = new ContextMenu();
+            
+            MenuItem addItem = new MenuItem { Header = "添加书签" };
+            addItem.Click += AddBookmark_Click;
+            menu.Items.Add(addItem);
+            
+            MenuItem editItem = new MenuItem { Header = "编辑书签" };
+            editItem.Click += EditBookmark_Click;
+            menu.Items.Add(editItem);
+            
+            MenuItem deleteItem = new MenuItem { Header = "删除书签" };
+            deleteItem.Click += DeleteBookmark_Click;
+            menu.Items.Add(deleteItem);
+            
+            menu.Items.Add(new Separator());
+            
+            MenuItem childItem = new MenuItem { Header = "添加子书签" };
+            childItem.Click += AddChildBookmark_Click;
+            menu.Items.Add(childItem);
+            
+            menu.Items.Add(new Separator());
+            
+            MenuItem saveItem = new MenuItem { Header = "保存书签到PDF" };
+            saveItem.Click += SaveBookmarks_Click;
+            menu.Items.Add(saveItem);
+            
+            menu.IsOpen = true;
+        }
+
+        private void BookmarkSearchBox_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            // 实时搜索书签
+            string searchText = BookmarkSearchBox.Text.Trim().ToLower();
+            if (string.IsNullOrEmpty(searchText))
+            {
+                UpdateBookmarkTree();
+                return;
+            }
+
+            var filtered = FilterBookmarks(bookmarkItems, searchText);
+            BookmarkTree.ItemsSource = null;
+            BookmarkTree.ItemsSource = filtered;
         }
     }
 }
