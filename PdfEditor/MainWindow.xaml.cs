@@ -1085,131 +1085,65 @@ namespace PdfEditor
                     {
                         int pageCount = fpdfview.FPDF_GetPageCount(doc);
                         
-                        // 创建演示文稿
+                        // 获取第一页尺寸用于设置幻灯片大小
+                        float pdfWidthPts = 595.28f;  // 默认 A4 宽度
+                        float pdfHeightPts = 841.89f; // 默认 A4 高度
+                        
+                        if (pageCount > 0)
+                        {
+                            FpdfPageT firstPage = fpdfview.FPDF_LoadPage(doc, 0);
+                            if (firstPage != null)
+                            {
+                                pdfWidthPts = (float)fpdfview.FPDF_GetPageWidth(firstPage);
+                                pdfHeightPts = (float)fpdfview.FPDF_GetPageHeight(firstPage);
+                                fpdfview.FPDF_ClosePage(firstPage);
+                            }
+                        }
+                        
+                        // 将 PDF 点转换为 EMU (1 point = 12700 EMU)
+                        long slideWidthEmu = (long)(pdfWidthPts * 12700);
+                        long slideHeightEmu = (long)(pdfHeightPts * 12700);
+                        
                         using (var presentationDocument = PresentationDocument.Create(outputPath, PresentationDocumentType.Presentation))
                         {
-                            // 添加演示文稿部分
                             PresentationPart presentationPart = presentationDocument.AddPresentationPart();
                             presentationPart.Presentation = new P.Presentation();
                             
-                            // 设置幻灯片大小 (4:3)
-                            P.SlideSize slideSize = new P.SlideSize() 
-                            { 
-                                Cx = 9144000, 
-                                Cy = 6858000, 
-                                Type = P.SlideSizeValues.Screen4x3 
-                            };
-                            presentationPart.Presentation.Append(slideSize);
-                            
-                            // 初始化幻灯片列表
-                            P.SlideIdList slideIdList = new P.SlideIdList();
-                            presentationPart.Presentation.Append(slideIdList);
-                            
                             // 创建幻灯片母版
                             SlideMasterPart slideMasterPart = presentationPart.AddNewPart<SlideMasterPart>();
-                            
-                            // 创建母版内容
-                            P.SlideMaster slideMaster = new P.SlideMaster(
-                                new P.CommonSlideData(
-                                    new P.ShapeTree(
-                                        new P.NonVisualGroupShapeProperties(
-                                            new P.NonVisualDrawingProperties() { Id = 1U, Name = "" },
-                                            new P.NonVisualGroupShapeDrawingProperties(),
-                                            new P.ApplicationNonVisualDrawingProperties()),
-                                        new P.GroupShapeProperties(
-                                            new D.TransformGroup(
-                                                new D.Offset() { X = 0L, Y = 0L },
-                                                new D.Extents() { Cx = 0L, Cy = 0L },
-                                                new D.ChildOffset() { X = 0L, Y = 0L },
-                                                new D.ChildExtents() { Cx = 0L, Cy = 0L })))),
-                                new P.ColorMap()
-                                {
-                                    Background1 = D.ColorSchemeIndexValues.Light1,
-                                    Text1 = D.ColorSchemeIndexValues.Dark1,
-                                    Background2 = D.ColorSchemeIndexValues.Light2,
-                                    Text2 = D.ColorSchemeIndexValues.Dark2,
-                                    Accent1 = D.ColorSchemeIndexValues.Accent1,
-                                    Accent2 = D.ColorSchemeIndexValues.Accent2,
-                                    Accent3 = D.ColorSchemeIndexValues.Accent3,
-                                    Accent4 = D.ColorSchemeIndexValues.Accent4,
-                                    Accent5 = D.ColorSchemeIndexValues.Accent5,
-                                    Accent6 = D.ColorSchemeIndexValues.Accent6,
-                                    Hyperlink = D.ColorSchemeIndexValues.Hyperlink,
-                                    FollowedHyperlink = D.ColorSchemeIndexValues.FollowedHyperlink
-                                });
-                            
-                            P.SlideLayoutIdList layoutIdList = new P.SlideLayoutIdList();
-                            layoutIdList.Append(new P.SlideLayoutId() { Id = 2147483649U });
-                            slideMaster.Append(layoutIdList);
-                            slideMasterPart.SlideMaster = slideMaster;
-                            
-                            // 创建幻灯片布局
-                            SlideLayoutPart slideLayoutPart = slideMasterPart.AddNewPart<SlideLayoutPart>();
-                            P.SlideLayout slideLayout = new P.SlideLayout(
-                                new P.CommonSlideData(
-                                    new P.ShapeTree(
-                                        new P.NonVisualGroupShapeProperties(
-                                            new P.NonVisualDrawingProperties() { Id = 1U, Name = "" },
-                                            new P.NonVisualGroupShapeDrawingProperties(),
-                                            new P.ApplicationNonVisualDrawingProperties()),
-                                        new P.GroupShapeProperties(
-                                            new D.TransformGroup(
-                                                new D.Offset() { X = 0L, Y = 0L },
-                                                new D.Extents() { Cx = 0L, Cy = 0L },
-                                                new D.ChildOffset() { X = 0L, Y = 0L },
-                                                new D.ChildExtents() { Cx = 0L, Cy = 0L })))),
-                                new P.ColorMapOverride(new D.MasterColorMapping()))
-                            {
-                                Type = P.SlideLayoutValues.Blank
-                            };
-                            slideLayoutPart.SlideLayout = slideLayout;
+                            GenerateSlideMaster(slideMasterPart);
                             
                             // 创建主题
                             ThemePart themePart = slideMasterPart.AddNewPart<ThemePart>();
-                            D.Theme theme = new D.Theme() { Name = "Office Theme" };
+                            GenerateTheme(themePart);
                             
-                            D.ThemeElements themeElements = new D.ThemeElements();
-                            D.ColorScheme colorScheme = new D.ColorScheme() { Name = "Office" };
-                            colorScheme.Append(new D.Dark1Color(new D.SystemColor() { Val = D.SystemColorValues.WindowText, LastColor = "000000" }));
-                            colorScheme.Append(new D.Light1Color(new D.SystemColor() { Val = D.SystemColorValues.Window, LastColor = "FFFFFF" }));
-                            colorScheme.Append(new D.Dark2Color(new D.RgbColorModelHex() { Val = "1F497D" }));
-                            colorScheme.Append(new D.Light2Color(new D.RgbColorModelHex() { Val = "EEECE1" }));
-                            colorScheme.Append(new D.Accent1Color(new D.RgbColorModelHex() { Val = "4F81BD" }));
-                            colorScheme.Append(new D.Accent2Color(new D.RgbColorModelHex() { Val = "C0504D" }));
-                            colorScheme.Append(new D.Accent3Color(new D.RgbColorModelHex() { Val = "9BBB59" }));
-                            colorScheme.Append(new D.Accent4Color(new D.RgbColorModelHex() { Val = "8064A2" }));
-                            colorScheme.Append(new D.Accent5Color(new D.RgbColorModelHex() { Val = "4BACC6" }));
-                            colorScheme.Append(new D.Accent6Color(new D.RgbColorModelHex() { Val = "F79646" }));
-                            colorScheme.Append(new D.Hyperlink(new D.RgbColorModelHex() { Val = "0000FF" }));
-                            colorScheme.Append(new D.FollowedHyperlinkColor(new D.RgbColorModelHex() { Val = "800080" }));
-                            themeElements.Append(colorScheme);
-                            
-                            D.FontScheme fontScheme = new D.FontScheme() { Name = "Office" };
-                            fontScheme.Append(new D.MajorFont(new D.LatinFont() { Typeface = "Calibri" }));
-                            fontScheme.Append(new D.MinorFont(new D.LatinFont() { Typeface = "Calibri" }));
-                            themeElements.Append(fontScheme);
-                            
-                            D.FormatScheme formatScheme = new D.FormatScheme() { Name = "Office" };
-                            formatScheme.Append(new D.FillStyleList());
-                            formatScheme.Append(new D.LineStyleList());
-                            formatScheme.Append(new D.EffectStyleList());
-                            themeElements.Append(formatScheme);
-                            
-                            theme.Append(themeElements);
-                            theme.Append(new D.ObjectDefaults());
-                            theme.Append(new D.ExtraColorSchemeList());
-                            themePart.Theme = theme;
+                            // 创建幻灯片布局
+                            SlideLayoutPart slideLayoutPart = slideMasterPart.AddNewPart<SlideLayoutPart>();
+                            GenerateSlideLayout(slideLayoutPart);
                             
                             // 添加母版引用
-                            P.SlideMasterIdList masterIdList = new P.SlideMasterIdList();
-                            masterIdList.Append(new P.SlideMasterId() { Id = 2147483648U, RelationshipId = presentationPart.GetIdOfPart(slideMasterPart) });
-                            presentationPart.Presentation.PrependChild(masterIdList);
+                            P.SlideMasterIdList masterIdList = new P.SlideMasterIdList(
+                                new P.SlideMasterId() { Id = 2147483648U, RelationshipId = presentationPart.GetIdOfPart(slideMasterPart) }
+                            );
+                            presentationPart.Presentation.SlideMasterIdList = masterIdList;
                             
-                            // 渲染每一页为图片
+                            // 设置幻灯片大小 (SlideSize 使用 Int32Value)
+                            presentationPart.Presentation.SlideSize = new P.SlideSize() 
+                            { 
+                                Cx = (int)slideWidthEmu, 
+                                Cy = (int)slideHeightEmu, 
+                                Type = P.SlideSizeValues.Custom 
+                            };
+                            
+                            // 创建幻灯片列表
+                            P.SlideIdList slideIdList = new P.SlideIdList();
+                            presentationPart.Presentation.SlideIdList = slideIdList;
+                            
+                            // 渲染每一页
                             for (int i = 0; i < pageCount; i++)
                             {
-                                // 在循环开始时创建 SlidePart
                                 SlidePart slidePart = presentationPart.AddNewPart<SlidePart>();
+                                slidePart.AddPart(slideLayoutPart);
                                 
                                 FpdfPageT page = fpdfview.FPDF_LoadPage(doc, i);
                                 if (page != null)
@@ -1219,59 +1153,60 @@ namespace PdfEditor
                                         float pageWidth = (float)fpdfview.FPDF_GetPageWidth(page);
                                         float pageHeight = (float)fpdfview.FPDF_GetPageHeight(page);
                                         
+                                        // 2x 缩放渲染
                                         int renderWidth = (int)(pageWidth * 2);
                                         int renderHeight = (int)(pageHeight * 2);
                                         
                                         FpdfBitmapT bitmap = fpdfview.FPDFBitmapCreateEx(renderWidth, renderHeight, (int)FPDFBitmapFormat.BGRA, IntPtr.Zero, 0);
                                         fpdfview.FPDFBitmapFillRect(bitmap, 0, 0, renderWidth, renderHeight, 0xFFFFFFFF);
                                         fpdfview.FPDF_RenderPageBitmap(bitmap, page, 0, 0, renderWidth, renderHeight, 0, 0);
-
+                                        
                                         IntPtr buffer = fpdfview.FPDFBitmapGetBuffer(bitmap);
                                         int stride = fpdfview.FPDFBitmapGetStride(bitmap);
                                         
-                                        // 创建新的位图并正确复制像素数据（解决上下颠倒问题）
-                                        using (var correctBmp = new System.Drawing.Bitmap(renderWidth, renderHeight, System.Drawing.Imaging.PixelFormat.Format32bppArgb))
+                                        // 使用 LockBits 高效翻转图像
+                                        using (var bmp = new System.Drawing.Bitmap(renderWidth, renderHeight, System.Drawing.Imaging.PixelFormat.Format32bppArgb))
                                         {
+                                            var bmpData = bmp.LockBits(
+                                                new System.Drawing.Rectangle(0, 0, renderWidth, renderHeight),
+                                                System.Drawing.Imaging.ImageLockMode.WriteOnly,
+                                                System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+                                            
+                                            // PDFium 位图是 bottom-up，我们需要翻转 Y 轴
+                                            byte[] rowBuffer = new byte[stride];
                                             for (int y = 0; y < renderHeight; y++)
                                             {
-                                                IntPtr rowPtr = IntPtr.Add(buffer, y * stride);
-                                                for (int x = 0; x < renderWidth; x++)
-                                                {
-                                                    // PDFium: BGRA 格式
-                                                    // System.Drawing: BGRA 格式，但存储顺序是 bottom-up
-                                                    // 我们需要翻转 Y 轴
-                                                    int destY = renderHeight - 1 - y;
-                                                    System.Drawing.Color color = System.Drawing.Color.FromArgb(
-                                                        Marshal.ReadByte(IntPtr.Add(rowPtr, x * 4 + 3)),  // A
-                                                        Marshal.ReadByte(IntPtr.Add(rowPtr, x * 4 + 2)),  // R
-                                                        Marshal.ReadByte(IntPtr.Add(rowPtr, x * 4 + 1)),  // G
-                                                        Marshal.ReadByte(IntPtr.Add(rowPtr, x * 4 + 0))   // B
-                                                    );
-                                                    correctBmp.SetPixel(x, destY, color);
-                                                }
+                                                IntPtr srcRow = IntPtr.Add(buffer, y * stride);
+                                                IntPtr destRow = IntPtr.Add(bmpData.Scan0, (renderHeight - 1 - y) * bmpData.Stride);
+                                                // 复制整行像素数据
+                                                Marshal.Copy(srcRow, rowBuffer, 0, stride);
+                                                Marshal.Copy(rowBuffer, 0, destRow, stride);
                                             }
                                             
+                                            bmp.UnlockBits(bmpData);
+                                            
+                                            // 保存为 PNG
                                             ImagePart imagePart = slidePart.AddImagePart(ImagePartType.Png);
                                             using (var ms = new System.IO.MemoryStream())
                                             {
-                                                correctBmp.Save(ms, System.Drawing.Imaging.ImageFormat.Png);
+                                                bmp.Save(ms, System.Drawing.Imaging.ImageFormat.Png);
                                                 ms.Position = 0;
                                                 imagePart.FeedData(ms);
                                             }
                                             
-                                            // 创建幻灯片
-                                            CreateSlidePart(slidePart, slidePart.GetIdOfPart(imagePart), i + 1, renderWidth, renderHeight);
+                                            // 生成幻灯片
+                                            GenerateSlide(slidePart, slidePart.GetIdOfPart(imagePart), slideWidthEmu, slideHeightEmu);
                                         }
                                         
-                                        // 释放位图
-                                        Marshal.FreeHGlobal(buffer);
+                                        fpdfview.FPDFBitmapDestroy(bitmap);
                                     }
                                     finally
                                     {
                                         fpdfview.FPDF_ClosePage(page);
                                     }
                                 }
-
+                                
+                                // 添加幻灯片引用
                                 P.SlideId slideId = new P.SlideId() 
                                 { 
                                     Id = (uint)(256 + i), 
@@ -1279,10 +1214,10 @@ namespace PdfEditor
                                 };
                                 slideIdList.Append(slideId);
                             }
-
+                            
                             presentationPart.Presentation.Save();
                         }
-
+                        
                         MessageBox.Show($"PowerPoint 导出完成！共 {pageCount} 页，已保存到: {outputPath}", "完成", MessageBoxButton.OK, MessageBoxImage.Information);
                     }
                     finally
@@ -1301,22 +1236,103 @@ namespace PdfEditor
             }
         }
         
-        private static void CreateSlidePart(SlidePart slidePart, string imageRelationshipId, int slideNumber, int imageWidth, int imageHeight)
+        private static void GenerateSlideMaster(SlideMasterPart part)
         {
-            // 根据图片比例计算在幻灯片中的尺寸和位置
-            long slideWidth = 9144000;
-            long slideHeight = 6858000;
+            P.SlideMaster master = new P.SlideMaster(
+                new P.CommonSlideData(
+                    new P.ShapeTree(
+                        new P.NonVisualGroupShapeProperties(
+                            new P.NonVisualDrawingProperties() { Id = 1U, Name = "" },
+                            new P.NonVisualGroupShapeDrawingProperties(),
+                            new P.ApplicationNonVisualDrawingProperties()),
+                        new P.GroupShapeProperties(
+                            new D.TransformGroup(
+                                new D.Offset() { X = 0L, Y = 0L },
+                                new D.Extents() { Cx = 0L, Cy = 0L },
+                                new D.ChildOffset() { X = 0L, Y = 0L },
+                                new D.ChildExtents() { Cx = 0L, Cy = 0L })))),
+                new P.ColorMap()
+                {
+                    Background1 = D.ColorSchemeIndexValues.Light1,
+                    Text1 = D.ColorSchemeIndexValues.Dark1,
+                    Background2 = D.ColorSchemeIndexValues.Light2,
+                    Text2 = D.ColorSchemeIndexValues.Dark2,
+                    Accent1 = D.ColorSchemeIndexValues.Accent1,
+                    Accent2 = D.ColorSchemeIndexValues.Accent2,
+                    Accent3 = D.ColorSchemeIndexValues.Accent3,
+                    Accent4 = D.ColorSchemeIndexValues.Accent4,
+                    Accent5 = D.ColorSchemeIndexValues.Accent5,
+                    Accent6 = D.ColorSchemeIndexValues.Accent6,
+                    Hyperlink = D.ColorSchemeIndexValues.Hyperlink,
+                    FollowedHyperlink = D.ColorSchemeIndexValues.FollowedHyperlink
+                },
+                new P.SlideLayoutIdList(
+                    new P.SlideLayoutId() { Id = 2147483649U }));
+            part.SlideMaster = master;
+        }
+        
+        private static void GenerateSlideLayout(SlideLayoutPart part)
+        {
+            P.SlideLayout layout = new P.SlideLayout(
+                new P.CommonSlideData(
+                    new P.ShapeTree(
+                        new P.NonVisualGroupShapeProperties(
+                            new P.NonVisualDrawingProperties() { Id = 1U, Name = "" },
+                            new P.NonVisualGroupShapeDrawingProperties(),
+                            new P.ApplicationNonVisualDrawingProperties()),
+                        new P.GroupShapeProperties(
+                            new D.TransformGroup(
+                                new D.Offset() { X = 0L, Y = 0L },
+                                new D.Extents() { Cx = 0L, Cy = 0L },
+                                new D.ChildOffset() { X = 0L, Y = 0L },
+                                new D.ChildExtents() { Cx = 0L, Cy = 0L })))),
+                new P.ColorMapOverride(new D.MasterColorMapping()))
+            {
+                Type = P.SlideLayoutValues.Blank
+            };
+            part.SlideLayout = layout;
+        }
+        
+        private static void GenerateTheme(ThemePart part)
+        {
+            D.ColorScheme colorScheme = new D.ColorScheme() { Name = "Office" };
+            colorScheme.Append(new D.Dark1Color(new D.SystemColor() { Val = D.SystemColorValues.WindowText, LastColor = "000000" }));
+            colorScheme.Append(new D.Light1Color(new D.SystemColor() { Val = D.SystemColorValues.Window, LastColor = "FFFFFF" }));
+            colorScheme.Append(new D.Dark2Color(new D.RgbColorModelHex() { Val = "1F497D" }));
+            colorScheme.Append(new D.Light2Color(new D.RgbColorModelHex() { Val = "EEECE1" }));
+            colorScheme.Append(new D.Accent1Color(new D.RgbColorModelHex() { Val = "4F81BD" }));
+            colorScheme.Append(new D.Accent2Color(new D.RgbColorModelHex() { Val = "C0504D" }));
+            colorScheme.Append(new D.Accent3Color(new D.RgbColorModelHex() { Val = "9BBB59" }));
+            colorScheme.Append(new D.Accent4Color(new D.RgbColorModelHex() { Val = "8064A2" }));
+            colorScheme.Append(new D.Accent5Color(new D.RgbColorModelHex() { Val = "4BACC6" }));
+            colorScheme.Append(new D.Accent6Color(new D.RgbColorModelHex() { Val = "F79646" }));
+            colorScheme.Append(new D.Hyperlink(new D.RgbColorModelHex() { Val = "0000FF" }));
+            colorScheme.Append(new D.FollowedHyperlinkColor(new D.RgbColorModelHex() { Val = "800080" }));
             
-            // 计算缩放比例，使图片适应幻灯片
-            double scaleX = (double)slideWidth / imageWidth;
-            double scaleY = (double)slideHeight / imageHeight;
-            double scale = Math.Min(scaleX, scaleY);
+            D.FontScheme fontScheme = new D.FontScheme() { Name = "Office" };
+            fontScheme.Append(new D.MajorFont(new D.LatinFont() { Typeface = "Calibri" }));
+            fontScheme.Append(new D.MinorFont(new D.LatinFont() { Typeface = "Calibri" }));
             
-            long cx = (long)(imageWidth * scale);
-            long cy = (long)(imageHeight * scale);
-            long x = (slideWidth - cx) / 2;
-            long y = (slideHeight - cy) / 2;
+            D.FormatScheme formatScheme = new D.FormatScheme() { Name = "Office" };
+            formatScheme.Append(new D.FillStyleList());
+            formatScheme.Append(new D.LineStyleList());
+            formatScheme.Append(new D.EffectStyleList());
             
+            D.ThemeElements elements = new D.ThemeElements();
+            elements.Append(colorScheme);
+            elements.Append(fontScheme);
+            elements.Append(formatScheme);
+            
+            D.Theme theme = new D.Theme() { Name = "Office Theme" };
+            theme.Append(elements);
+            theme.Append(new D.ObjectDefaults());
+            theme.Append(new D.ExtraColorSchemeList());
+            
+            part.Theme = theme;
+        }
+        
+        private static void GenerateSlide(SlidePart part, string imageRid, long slideWidthEmu, long slideHeightEmu)
+        {
             P.Slide slide = new P.Slide(
                 new P.CommonSlideData(
                     new P.ShapeTree(
@@ -1332,20 +1348,20 @@ namespace PdfEditor
                                 new D.ChildExtents() { Cx = 0L, Cy = 0L })),
                         new P.Picture(
                             new P.NonVisualPictureProperties(
-                                new P.NonVisualDrawingProperties() { Id = 2U, Name = $"Picture {slideNumber}" },
+                                new P.NonVisualDrawingProperties() { Id = 2U, Name = "SlideImage" },
                                 new P.NonVisualPictureDrawingProperties(new D.PictureLocks() { NoChangeAspect = true }),
                                 new P.ApplicationNonVisualDrawingProperties()),
                             new P.BlipFill(
-                                new D.Blip() { Embed = imageRelationshipId },
+                                new D.Blip() { Embed = imageRid },
                                 new D.Stretch(new D.FillRectangle())),
                             new P.ShapeProperties(
                                 new D.Transform2D(
-                                    new D.Offset() { X = x, Y = y },
-                                    new D.Extents() { Cx = cx, Cy = cy }),
+                                    new D.Offset() { X = 0L, Y = 0L },
+                                    new D.Extents() { Cx = slideWidthEmu, Cy = slideHeightEmu }),
                                 new D.PresetGeometry(new D.AdjustValueList()) { Preset = D.ShapeTypeValues.Rectangle })))),
                 new P.ColorMapOverride(new D.MasterColorMapping()));
-
-            slidePart.Slide = slide;
+            
+            part.Slide = slide;
         }
 
         private static void CreateZipEntry(System.IO.Compression.ZipArchive zip, string entryName, string content)
