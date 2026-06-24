@@ -1066,143 +1066,220 @@ namespace PdfEditor
         {
             try
             {
-                string text = ExtractTextFromPdf(ExportPdfPath.Text);
-                
-                using (FileStream fs = new FileStream(outputPath, FileMode.Create))
-                using (System.IO.Compression.ZipArchive zip = new System.IO.Compression.ZipArchive(fs, System.IO.Compression.ZipArchiveMode.Create))
+                string pdfPath = ExportPdfPath.Text;
+                int pageCount = 0;
+
+                using (var pdfDocument = PdfiumViewer.PdfDocument.Load(pdfPath))
                 {
-                    CreateZipEntry(zip, "[Content_Types].xml", @"<?xml version=""1.0"" encoding=""UTF-8"" standalone=""yes""?>
-<Types xmlns=""http://schemas.openxmlformats.org/package/2006/content-types"">
-<Default Extension=""rels"" ContentType=""application/vnd.openxmlformats-package.relationships+xml""/>
-<Default Extension=""xml"" ContentType=""application/xml""/>
-<Override PartName=""/ppt/presentation.xml"" ContentType=""application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml""/>
-<Override PartName=""/ppt/slides/slide1.xml"" ContentType=""application/vnd.openxmlformats-officedocument.presentationml.slide+xml""/>
-<Override PartName=""/ppt/slideMasters/slideMaster1.xml"" ContentType=""application/vnd.openxmlformats-officedocument.presentationml.slideMaster+xml""/>
-<Override PartName=""/ppt/slideLayouts/slideLayout1.xml"" ContentType=""application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml""/>
-<Override PartName=""/ppt/theme/theme1.xml"" ContentType=""application/vnd.openxmlformats-officedocument.theme+xml""/>
-<Override PartName=""/docProps/core.xml"" ContentType=""application/vnd.openxmlformats-package.core-properties+xml""/>
-<Override PartName=""/docProps/app.xml"" ContentType=""application/vnd.openxmlformats-officedocument.extended-properties+xml""/>
-</Types>");
+                    pageCount = pdfDocument.PageCount;
 
-                    CreateZipEntry(zip, "_rels/.rels", @"<?xml version=""1.0"" encoding=""UTF-8"" standalone=""yes""?>
-<Relationships xmlns=""http://schemas.openxmlformats.org/package/2006/relationships"">
-<Relationship Id=""rId1"" Type=""http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument"" Target=""ppt/presentation.xml""/>
-<Relationship Id=""rId2"" Type=""http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties"" Target=""docProps/core.xml""/>
-<Relationship Id=""rId3"" Type=""http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties"" Target=""docProps/app.xml""/>
-</Relationships>");
+                    using (var presentationDocument = PresentationDocument.Create(outputPath, PresentationDocumentType.Presentation))
+                    {
+                        var presentationPart = presentationDocument.AddPresentationPart();
+                        presentationPart.Presentation = new P.Presentation();
 
-                    CreateZipEntry(zip, "ppt/_rels/presentation.xml.rels", @"<?xml version=""1.0"" encoding=""UTF-8"" standalone=""yes""?>
-<Relationships xmlns=""http://schemas.openxmlformats.org/package/2006/relationships"">
-<Relationship Id=""rId1"" Type=""http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideMaster"" Target=""slideMasters/slideMaster1.xml""/>
-<Relationship Id=""rId2"" Type=""http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide"" Target=""slides/slide1.xml""/>
-<Relationship Id=""rId3"" Type=""http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme"" Target=""theme/theme1.xml""/>
-</Relationships>");
+                        var slideMasterIdList = new P.SlideMasterIdList();
+                        var slideMasterId = new P.SlideMasterId() { Id = 2147483648U };
+                        slideMasterIdList.Append(slideMasterId);
 
-                    CreateZipEntry(zip, "ppt/presentation.xml", @"<?xml version=""1.0"" encoding=""UTF-8"" standalone=""yes""?>
-<p:presentation xmlns:p=""http://schemas.openxmlformats.org/presentationml/2006/main"" xmlns:a=""http://schemas.openxmlformats.org/drawingml/2006/main"" xmlns:r=""http://schemas.openxmlformats.org/officeDocument/2006/relationships"">
-<p:sldMasterIdLst><p:sldMasterId id=""2147483648"" r:id=""rId1""/></p:sldMasterIdLst>
-<p:sldIdLst><p:sldId id=""256"" r:id=""rId2""/></p:sldIdLst>
-<p:sldSz cx=""9144000"" cy=""6858000"" type=""screen4x3""/>
-<p:notesSz cx=""6858000"" cy=""9144000""/>
-</p:presentation>");
+                        var slideIdList = new P.SlideIdList();
+                        var slideSize = new P.SlideSize() { Cx = 9144000, Cy = 6858000, Type = P.SlideSizeValues.Screen4x3 };
+                        var notesSize = new P.NotesSize() { Cx = 6858000L, Cy = 9144000L };
 
-                    CreateZipEntry(zip, "ppt/slideMasters/slideMaster1.xml", @"<?xml version=""1.0"" encoding=""UTF-8"" standalone=""yes""?>
-<p:sldMaster xmlns:p=""http://schemas.openxmlformats.org/presentationml/2006/main"" xmlns:a=""http://schemas.openxmlformats.org/drawingml/2006/main"" xmlns:r=""http://schemas.openxmlformats.org/officeDocument/2006/relationships"">
-<p:cSld>
-<p:spTree>
-<p:nvGrpSpPr><p:cNvPr id=""1"" name=""""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>
-<p:grpSpPr><a:xfrm><a:off x=""0"" y=""0""/><a:ext cx=""0"" cy=""0""/><a:chOff x=""0"" y=""0""/><a:chExt cx=""0"" cy=""/></a:xfrm></p:grpSpPr>
-</p:spTree>
-</p:cSld>
-<p:clrMap bg1=""lt1"" tx1=""dk1"" bg2=""lt2"" tx2=""dk2"" accent1=""accent1"" accent2=""accent2"" accent3=""accent3"" accent4=""accent4"" accent5=""accent5"" accent6=""accent6"" hlink=""hlink"" folHlink=""folHlink""/>
-<p:sldLayoutIdLst><p:sldLayoutId id=""2147483649"" r:id=""rId1""/></p:sldLayoutIdLst>
-</p:sldMaster>");
+                        presentationPart.Presentation.Append(slideMasterIdList);
+                        presentationPart.Presentation.Append(slideIdList);
+                        presentationPart.Presentation.Append(slideSize);
+                        presentationPart.Presentation.Append(notesSize);
 
-                    CreateZipEntry(zip, "ppt/slideMasters/_rels/slideMaster1.xml.rels", @"<?xml version=""1.0"" encoding=""UTF-8"" standalone=""yes""?>
-<Relationships xmlns=""http://schemas.openxmlformats.org/package/2006/relationships"">
-<Relationship Id=""rId1"" Type=""http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout"" Target=""../slideLayouts/slideLayout1.xml""/>
-<Relationship Id=""rId2"" Type=""http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme"" Target=""../theme/theme1.xml""/>
-</Relationships>");
+                        var slideMasterPart = presentationPart.AddNewPart<SlideMasterPart>("rId1");
+                        GenerateSlideMasterPartContent(slideMasterPart);
 
-                    CreateZipEntry(zip, "ppt/slideLayouts/slideLayout1.xml", @"<?xml version=""1.0"" encoding=""UTF-8"" standalone=""yes""?>
-<p:sldLayout xmlns:p=""http://schemas.openxmlformats.org/presentationml/2006/main"" xmlns:a=""http://schemas.openxmlformats.org/drawingml/2006/main"" type=""blank"">
-<p:cSld>
-<p:spTree>
-<p:nvGrpSpPr><p:cNvPr id=""1"" name=""""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>
-<p:grpSpPr><a:xfrm><a:off x=""0"" y=""0""/><a:ext cx=""0"" cy=""0""/><a:chOff x=""0"" y=""0""/><a:chExt cx=""0"" cy=""/></a:xfrm></p:grpSpPr>
-</p:spTree>
-</p:cSld>
-<p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr>
-</p:sldLayout>");
+                        var themePart = slideMasterPart.AddNewPart<ThemePart>("rId2");
+                        GenerateThemePartContent(themePart);
 
-                    CreateZipEntry(zip, "ppt/theme/theme1.xml", @"<?xml version=""1.0"" encoding=""UTF-8"" standalone=""yes""?>
-<a:theme xmlns:a=""http://schemas.openxmlformats.org/drawingml/2006/main"" name=""Office Theme"">
-<a:themeElements>
-<a:clrScheme name=""Office"">
-<a:dk1><a:sysClr val=""windowText"" lastClr=""000000""/></a:dk1>
-<a:lt1><a:sysClr val=""window"" lastClr=""FFFFFF""/></a:lt1>
-<a:dk2><a:srgbClr val=""1F497D""/></a:dk2>
-<a:lt2><a:srgbClr val=""EEECE1""/></a:lt2>
-<a:accent1><a:srgbClr val=""4F81BD""/></a:accent1>
-<a:accent2><a:srgbClr val=""C0504D""/></a:accent2>
-<a:accent3><a:srgbClr val=""9BBB59""/></a:accent3>
-<a:accent4><a:srgbClr val=""8064A2""/></a:accent4>
-<a:accent5><a:srgbClr val=""4BACC6""/></a:accent5>
-<a:accent6><a:srgbClr val=""F79646""/></a:accent6>
-<a:hlink><a:srgbClr val=""0000FF""/></a:hlink>
-<a:folHlink><a:srgbClr val=""800080""/></a:folHlink>
-</a:clrScheme>
-<a:fontScheme name=""Office""><a:majorFont><a:latin typeface=""Calibri""/></a:majorFont><a:minorFont><a:latin typeface=""Calibri""/></a:minorFont></a:fontScheme>
-</a:themeElements>
-</a:theme>");
+                        var slideLayoutPart = slideMasterPart.AddNewPart<SlideLayoutPart>("rId1");
+                        GenerateSlideLayoutPartContent(slideLayoutPart);
 
-                    string escapedText = text.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;").Replace("\"", "&quot;").Replace("'", "&apos;");
-                    CreateZipEntry(zip, "ppt/slides/slide1.xml", $@"<?xml version=""1.0"" encoding=""UTF-8"" standalone=""yes""?>
-<p:sld xmlns:p=""http://schemas.openxmlformats.org/presentationml/2006/main"" xmlns:a=""http://schemas.openxmlformats.org/drawingml/2006/main"" xmlns:r=""http://schemas.openxmlformats.org/officeDocument/2006/relationships"">
-<p:cSld>
-<p:spTree>
-<p:nvGrpSpPr><p:cNvPr id=""1"" name=""""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>
-<p:grpSpPr><a:xfrm><a:off x=""0"" y=""0""/><a:ext cx=""0"" cy=""0""/><a:chOff x=""0"" y=""0""/><a:chExt cx=""0"" cy=""/></a:xfrm></p:grpSpPr>
-<p:sp>
-<p:nvSpPr><p:cNvPr id=""2"" name=""Content""/><p:cNvSpPr txBox=""1""/><p:nvPr/></p:nvSpPr>
-<p:spPr><a:xfrm><a:off x=""720000"" y=""720000""/><a:ext cx=""7704000"" cy=""5418000""/></a:xfrm><a:prstGeom prst=""rect""/></p:spPr>
-<p:txBody>
-<a:bodyPr wrap=""square"" vert=""t""/>
-<a:lstStyle/>
-<a:p><a:r><a:rPr lang=""zh-CN"" sz=""1800""/><a:t>{escapedText}</a:t></a:r></a:p>
-</p:txBody>
-</p:sp>
-</p:spTree>
-</p:cSld>
-<p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr>
-</p:sld>");
+                        for (int i = 0; i < pageCount; i++)
+                        {
+                            int slideNum = i + 1;
+                            var slidePart = presentationPart.AddNewPart<SlidePart>($"rId{slideNum + 10}");
 
-                    CreateZipEntry(zip, "ppt/slides/_rels/slide1.xml.rels", @"<?xml version=""1.0"" encoding=""UTF-8"" standalone=""yes""?>
-<Relationships xmlns=""http://schemas.openxmlformats.org/package/2006/relationships"">
-<Relationship Id=""rId1"" Type=""http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout"" Target=""../slideLayouts/slideLayout1.xml""/>
-</Relationships>");
+                            using (var image = pdfDocument.Render(i, 150, 150, true))
+                            {
+                                using (var ms = new System.IO.MemoryStream())
+                                {
+                                    image.Save(ms, System.Drawing.Imaging.ImageFormat.Png);
+                                    ms.Position = 0;
 
-                    CreateZipEntry(zip, "docProps/core.xml", @"<?xml version=""1.0"" encoding=""UTF-8"" standalone=""yes""?>
-<cp:coreProperties xmlns:cp=""http://schemas.openxmlformats.org/package/2006/metadata/core-properties"" xmlns:dc=""http://purl.org/dc/elements/1.1/"" xmlns:dcterms=""http://purl.org/dc/terms/"">
-<dc:creator>PdfEditor</dc:creator>
-<cp:lastModifiedBy>PdfEditor</cp:lastModifiedBy>
-<dcterms:created>2024-01-01T00:00:00Z</dcterms:created>
-<dcterms:modified>2024-01-01T00:00:00Z</dcterms:modified>
-</cp:coreProperties>");
+                                    var imagePart = slidePart.AddNewPart<ImagePart>("image/png", $"rId2");
+                                    imagePart.FeedData(ms);
+                                }
+                            }
 
-                    CreateZipEntry(zip, "docProps/app.xml", @"<?xml version=""1.0"" encoding=""UTF-8"" standalone=""yes""?>
-<Properties xmlns=""http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"" xmlns:vt=""http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes"">
-<Application>PdfEditor</Application>
-<Slides>1</Slides>
-</Properties>");
+                            GenerateSlidePartContent(slidePart, slideNum);
+
+                            slidePart.AddPart(slideLayoutPart, "rId1");
+
+                            var newSlideId = new P.SlideId() { Id = (uint)(255 + slideNum), RelationshipId = presentationPart.GetIdOfPart(slidePart) };
+                            slideIdList.Append(newSlideId);
+                        }
+
+                        presentationPart.Presentation.Save();
+                    }
                 }
 
-                MessageBox.Show($"PowerPoint 导出完成！已保存到: {outputPath}", "完成", MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show($"PowerPoint 导出完成！共 {pageCount} 页，已保存到: {outputPath}", "完成", MessageBoxButton.OK, MessageBoxImage.Information);
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"PowerPoint 导出失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show($"PowerPoint 导出失败: {ex.Message}\n{ex.StackTrace}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
             }
+        }
+
+        private static void GenerateSlideMasterPartContent(SlideMasterPart slideMasterPart)
+        {
+            var slideMaster = new P.SlideMaster(
+                new P.CommonSlideData(
+                    new P.ShapeTree(
+                        new P.NonVisualGroupShapeProperties(
+                            new P.NonVisualDrawingProperties() { Id = 1U, Name = "" },
+                            new P.NonVisualGroupShapeDrawingProperties(),
+                            new P.ApplicationNonVisualDrawingProperties()),
+                        new P.GroupShapeProperties(
+                            new D.TransformGroup(
+                                new D.Offset() { X = 0L, Y = 0L },
+                                new D.Extents() { Cx = 0L, Cy = 0L },
+                                new D.ChildOffset() { X = 0L, Y = 0L },
+                                new D.ChildExtents() { Cx = 0L, Cy = 0L })))),
+                new P.ColorMap()
+                {
+                    Background1 = D.ColorSchemeIndexValues.Light1,
+                    Text1 = D.ColorSchemeIndexValues.Dark1,
+                    Background2 = D.ColorSchemeIndexValues.Light2,
+                    Text2 = D.ColorSchemeIndexValues.Dark2,
+                    Accent1 = D.ColorSchemeIndexValues.Accent1,
+                    Accent2 = D.ColorSchemeIndexValues.Accent2,
+                    Accent3 = D.ColorSchemeIndexValues.Accent3,
+                    Accent4 = D.ColorSchemeIndexValues.Accent4,
+                    Accent5 = D.ColorSchemeIndexValues.Accent5,
+                    Accent6 = D.ColorSchemeIndexValues.Accent6,
+                    Hyperlink = D.ColorSchemeIndexValues.Hyperlink,
+                    FollowedHyperlink = D.ColorSchemeIndexValues.FollowedHyperlink
+                },
+                new P.SlideLayoutIdList(
+                    new P.SlideLayoutId() { Id = 2147483649U }));
+
+            slideMasterPart.SlideMaster = slideMaster;
+        }
+
+        private static void GenerateSlideLayoutPartContent(SlideLayoutPart slideLayoutPart)
+        {
+            var slideLayout = new P.SlideLayout(
+                new P.CommonSlideData(
+                    new P.ShapeTree(
+                        new P.NonVisualGroupShapeProperties(
+                            new P.NonVisualDrawingProperties() { Id = 1U, Name = "" },
+                            new P.NonVisualGroupShapeDrawingProperties(),
+                            new P.ApplicationNonVisualDrawingProperties()),
+                        new P.GroupShapeProperties(
+                            new D.TransformGroup(
+                                new D.Offset() { X = 0L, Y = 0L },
+                                new D.Extents() { Cx = 0L, Cy = 0L },
+                                new D.ChildOffset() { X = 0L, Y = 0L },
+                                new D.ChildExtents() { Cx = 0L, Cy = 0L })))),
+                new P.ColorMapOverride(new D.MasterColorMapping()))
+            {
+                Type = P.SlideLayoutValues.Blank
+            };
+
+            slideLayoutPart.SlideLayout = slideLayout;
+        }
+
+        private static void GenerateThemePartContent(ThemePart themePart)
+        {
+            var theme = new D.Theme(
+                new D.ThemeElements(
+                    new D.ColorScheme(
+                        new D.Dark1Color(new D.SystemColor() { Val = D.SystemColorValues.WindowText, LastColor = "000000" }),
+                        new D.Light1Color(new D.SystemColor() { Val = D.SystemColorValues.Window, LastColor = "FFFFFF" }),
+                        new D.Dark2Color(new D.RgbColorModelHex() { Val = "1F497D" }),
+                        new D.Light2Color(new D.RgbColorModelHex() { Val = "EEECE1" }),
+                        new D.Accent1Color(new D.RgbColorModelHex() { Val = "4F81BD" }),
+                        new D.Accent2Color(new D.RgbColorModelHex() { Val = "C0504D" }),
+                        new D.Accent3Color(new D.RgbColorModelHex() { Val = "9BBB59" }),
+                        new D.Accent4Color(new D.RgbColorModelHex() { Val = "8064A2" }),
+                        new D.Accent5Color(new D.RgbColorModelHex() { Val = "4BACC6" }),
+                        new D.Accent6Color(new D.RgbColorModelHex() { Val = "F79646" }),
+                        new D.Hyperlink(new D.RgbColorModelHex() { Val = "0000FF" }),
+                        new D.FollowedHyperlinkColor(new D.RgbColorModelHex() { Val = "800080" }))
+                    { Name = "Office" },
+                    new D.FontScheme(
+                        new D.MajorFont(
+                            new D.LatinFont() { Typeface = "Calibri" }),
+                        new D.MinorFont(
+                            new D.LatinFont() { Typeface = "Calibri" }))
+                    { Name = "Office" },
+                    new D.FormatScheme(
+                        new D.FillStyleList(
+                            new D.NoFill(),
+                            new D.SolidFill(new D.SchemeColor() { Val = D.SchemeColorValues.PhColor }),
+                            new D.GradientFill(
+                                new D.GradientStopList(
+                                    new D.GradientStop(new D.SchemeColor() { Val = D.SchemeColorValues.PhColor }) { Position = 0 }),
+                                new D.LinearGradientFill() { Angle = 16200000, Scaled = true })),
+                        new D.LineStyleList(
+                            new D.Outline(new D.NoFill(), new D.PresetDash() { Val = D.PresetLineDashValues.Solid }) { Width = 9525, CapType = D.LineCapValues.Flat, CompoundLineType = D.CompoundLineValues.Single, Alignment = D.PenAlignmentValues.Center },
+                            new D.Outline(new D.SolidFill(new D.SchemeColor() { Val = D.SchemeColorValues.PhColor }), new D.PresetDash() { Val = D.PresetLineDashValues.Solid }) { Width = 9525, CapType = D.LineCapValues.Flat, CompoundLineType = D.CompoundLineValues.Single, Alignment = D.PenAlignmentValues.Center },
+                            new D.Outline(new D.SolidFill(new D.SchemeColor() { Val = D.SchemeColorValues.PhColor }), new D.PresetDash() { Val = D.PresetLineDashValues.Solid }) { Width = 9525, CapType = D.LineCapValues.Flat, CompoundLineType = D.CompoundLineValues.Single, Alignment = D.PenAlignmentValues.Center }),
+                        new D.EffectStyleList(
+                            new D.EffectStyle(new D.EffectList()),
+                            new D.EffectStyle(new D.EffectList()),
+                            new D.EffectStyle(new D.EffectList())),
+                        new D.BackgroundFillStyleList(
+                            new D.NoFill(),
+                            new D.SolidFill(new D.SchemeColor() { Val = D.SchemeColorValues.PhColor }),
+                            new D.GradientFill(
+                                new D.GradientStopList(
+                                    new D.GradientStop(new D.SchemeColor() { Val = D.SchemeColorValues.PhColor }) { Position = 0 }),
+                                new D.LinearGradientFill() { Angle = 16200000, Scaled = true })))
+                    { Name = "Office" }))
+            { Name = "Office Theme" };
+
+            themePart.Theme = theme;
+        }
+
+        private static void GenerateSlidePartContent(SlidePart slidePart, int slideNumber)
+        {
+            var slide = new P.Slide(
+                new P.CommonSlideData(
+                    new P.ShapeTree(
+                        new P.NonVisualGroupShapeProperties(
+                            new P.NonVisualDrawingProperties() { Id = 1U, Name = "" },
+                            new P.NonVisualGroupShapeDrawingProperties(),
+                            new P.ApplicationNonVisualDrawingProperties()),
+                        new P.GroupShapeProperties(
+                            new D.TransformGroup(
+                                new D.Offset() { X = 0L, Y = 0L },
+                                new D.Extents() { Cx = 0L, Cy = 0L },
+                                new D.ChildOffset() { X = 0L, Y = 0L },
+                                new D.ChildExtents() { Cx = 0L, Cy = 0L })),
+                        new P.Picture(
+                            new P.NonVisualPictureProperties(
+                                new P.NonVisualDrawingProperties() { Id = 2U, Name = $"Picture {slideNumber}" },
+                                new P.NonVisualPictureDrawingProperties(new D.PictureLocks() { NoChangeAspect = true }),
+                                new P.ApplicationNonVisualDrawingProperties()),
+                            new P.BlipFill(
+                                new D.Blip() { Embed = "rId2" },
+                                new D.Stretch(new D.FillRectangle())),
+                            new P.ShapeProperties(
+                                new D.Transform2D(
+                                    new D.Offset() { X = 0L, Y = 0L },
+                                    new D.Extents() { Cx = 9144000L, Cy = 6858000L }),
+                                new D.PresetGeometry(new D.AdjustValueList()) { Preset = D.ShapeTypeValues.Rectangle })))),
+                new P.ColorMapOverride(new D.MasterColorMapping()));
+
+            slidePart.Slide = slide;
         }
 
         private static void CreateZipEntry(System.IO.Compression.ZipArchive zip, string entryName, string content)

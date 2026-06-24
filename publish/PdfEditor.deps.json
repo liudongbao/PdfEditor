@@ -13,6 +13,7 @@
           "DocumentFormat.OpenXml": "3.0.2",
           "EPPlus": "5.8.10",
           "Microsoft.Web.WebView2": "1.0.2535.41",
+          "PdfiumViewer": "2.13.0",
           "iTextSharp": "5.5.13.3",
           "PdfWrapper": "0.0.0.0",
           "runtimepack.Microsoft.NETCore.App.Runtime.win-x64": "9.0.17",
@@ -1118,6 +1119,19 @@
           }
         }
       },
+      "PdfiumViewer/2.13.0": {
+        "runtime": {
+          "lib/net20/PdfiumViewer.dll": {
+            "assemblyVersion": "2.13.0.0",
+            "fileVersion": "2.13.0.0"
+          }
+        },
+        "resources": {
+          "lib/net20/nl/PdfiumViewer.resources.dll": {
+            "locale": "nl"
+          }
+        }
+      },
       "System.Drawing.Common/5.0.0": {
         "runtime": {
           "runtimes/win/lib/netcoreapp3.0/System.Drawing.Common.dll": {
@@ -1256,6 +1270,13 @@
       "sha512": "sha512-E3rAxpp2GVtg99wlRBjIM5YeCXFvhPQuHGn/rfxjAJLNbKfiflliljtY/aJBkMmCzf/KmDhTTmU1hoOsEtuW+Q==",
       "path": "microsoft.web.webview2/1.0.2535.41",
       "hashPath": "microsoft.web.webview2.1.0.2535.41.nupkg.sha512"
+    },
+    "PdfiumViewer/2.13.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-Nw4owBmJzDVXoMRjCnqPbET07CPOawwhcNjt+PyRaSxONN9bsFF+cm9kcMsDLEAEaxsiDJo5jls8bCQjvjidkA==",
+      "path": "pdfiumviewer/2.13.0",
+      "hashPath": "pdfiumviewer.2.13.0.nupkg.sha512"
     },
     "System.Drawing.Common/5.0.0": {
       "type": "package",

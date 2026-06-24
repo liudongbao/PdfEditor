@@ -12,6 +12,7 @@
     <PackageReference Include="EPPlus" Version="5.8.10" />
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2526.53" />
     <PackageReference Include="DocumentFormat.OpenXml" Version="3.0.2" />
+    <PackageReference Include="PdfiumViewer" Version="2.13.0" />
   </ItemGroup>
 
   <ItemGroup>
