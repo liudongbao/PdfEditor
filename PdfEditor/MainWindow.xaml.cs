@@ -17,7 +17,8 @@ using DocumentFormat.OpenXml.Packaging;
 using W = DocumentFormat.OpenXml.Wordprocessing;
 using P = DocumentFormat.OpenXml.Presentation;
 using D = DocumentFormat.OpenXml.Drawing;
-using PdfiumViewer;
+using PDFiumCore;
+using System.Drawing;
 
 namespace PdfEditor
 {
@@ -685,7 +686,7 @@ namespace PdfEditor
         }
 
         // 拖拽排序
-        private Point dragStartPoint;
+        private System.Windows.Point dragStartPoint;
         private BookmarkItem dragItem;
 
         private void BookmarkTree_MouseMove(object sender, MouseEventArgs e)
@@ -1068,69 +1069,112 @@ namespace PdfEditor
             try
             {
                 string pdfPath = ExportPdfPath.Text;
-                int pageCount = 0;
-
-                using (var pdfDocument = PdfiumViewer.PdfDocument.Load(pdfPath))
+                
+                fpdfview.FPDF_InitLibrary();
+                
+                try
                 {
-                    pageCount = pdfDocument.PageCount;
-
-                    using (var presentationDocument = PresentationDocument.Create(outputPath, PresentationDocumentType.Presentation))
+                    FpdfDocumentT doc = fpdfview.FPDF_LoadDocument(pdfPath, null);
+                    if (doc == null)
                     {
-                        var presentationPart = presentationDocument.AddPresentationPart();
-                        presentationPart.Presentation = new P.Presentation();
-
-                        var slideMasterIdList = new P.SlideMasterIdList();
-                        var slideMasterId = new P.SlideMasterId() { Id = 2147483648U };
-                        slideMasterIdList.Append(slideMasterId);
-
-                        var slideIdList = new P.SlideIdList();
-                        var slideSize = new P.SlideSize() { Cx = 9144000, Cy = 6858000, Type = P.SlideSizeValues.Screen4x3 };
-                        var notesSize = new P.NotesSize() { Cx = 6858000L, Cy = 9144000L };
-
-                        presentationPart.Presentation.Append(slideMasterIdList);
-                        presentationPart.Presentation.Append(slideIdList);
-                        presentationPart.Presentation.Append(slideSize);
-                        presentationPart.Presentation.Append(notesSize);
-
-                        var slideMasterPart = presentationPart.AddNewPart<SlideMasterPart>("rId1");
-                        GenerateSlideMasterPartContent(slideMasterPart);
-
-                        var themePart = slideMasterPart.AddNewPart<ThemePart>("rId2");
-                        GenerateThemePartContent(themePart);
-
-                        var slideLayoutPart = slideMasterPart.AddNewPart<SlideLayoutPart>("rId1");
-                        GenerateSlideLayoutPartContent(slideLayoutPart);
-
-                        for (int i = 0; i < pageCount; i++)
+                        throw new Exception("无法加载PDF文档");
+                    }
+                    
+                    try
+                    {
+                        int pageCount = fpdfview.FPDF_GetPageCount(doc);
+                        
+                        using (var presentationDocument = PresentationDocument.Create(outputPath, PresentationDocumentType.Presentation))
                         {
-                            int slideNum = i + 1;
-                            var slidePart = presentationPart.AddNewPart<SlidePart>($"rId{slideNum + 10}");
+                            var presentationPart = presentationDocument.AddPresentationPart();
+                            presentationPart.Presentation = new P.Presentation();
 
-                            using (var image = pdfDocument.Render(i, 150, 150, true))
+                            var slideMasterIdList = new P.SlideMasterIdList();
+                            var slideMasterId = new P.SlideMasterId() { Id = 2147483648U };
+                            slideMasterIdList.Append(slideMasterId);
+
+                            var slideIdList = new P.SlideIdList();
+                            var slideSize = new P.SlideSize() { Cx = 9144000, Cy = 6858000, Type = P.SlideSizeValues.Screen4x3 };
+                            var notesSize = new P.NotesSize() { Cx = 6858000L, Cy = 9144000L };
+
+                            presentationPart.Presentation.Append(slideMasterIdList);
+                            presentationPart.Presentation.Append(slideIdList);
+                            presentationPart.Presentation.Append(slideSize);
+                            presentationPart.Presentation.Append(notesSize);
+
+                            var slideMasterPart = presentationPart.AddNewPart<SlideMasterPart>("rId1");
+                            GenerateSlideMasterPartContent(slideMasterPart);
+
+                            var themePart = slideMasterPart.AddNewPart<ThemePart>("rId2");
+                            GenerateThemePartContent(themePart);
+
+                            var slideLayoutPart = slideMasterPart.AddNewPart<SlideLayoutPart>("rId1");
+                            GenerateSlideLayoutPartContent(slideLayoutPart);
+
+                            for (int i = 0; i < pageCount; i++)
                             {
-                                using (var ms = new System.IO.MemoryStream())
-                                {
-                                    image.Save(ms, System.Drawing.Imaging.ImageFormat.Png);
-                                    ms.Position = 0;
+                                int slideNum = i + 1;
+                                var slidePart = presentationPart.AddNewPart<SlidePart>($"rId{slideNum + 10}");
 
-                                    var imagePart = slidePart.AddNewPart<ImagePart>("image/png", $"rId2");
-                                    imagePart.FeedData(ms);
+                                FpdfPageT page = fpdfview.FPDF_LoadPage(doc, i);
+                                if (page != null)
+                                {
+                                    try
+                                    {
+                                        float width = (float)fpdfview.FPDF_GetPageWidth(page);
+                                        float height = (float)fpdfview.FPDF_GetPageHeight(page);
+                                        
+                                        int renderWidth = (int)(width * 2);
+                                        int renderHeight = (int)(height * 2);
+                                        
+                                        FpdfBitmapT bitmap = fpdfview.FPDFBitmapCreateEx(renderWidth, renderHeight, (int)FPDFBitmapFormat.BGRA, IntPtr.Zero, 0);
+                                        fpdfview.FPDFBitmapFillRect(bitmap, 0, 0, renderWidth, renderHeight, 0xFFFFFFFF);
+                                        fpdfview.FPDF_RenderPageBitmap(bitmap, page, 0, 0, renderWidth, renderHeight, 0, 0);
+
+                                        IntPtr buffer = fpdfview.FPDFBitmapGetBuffer(bitmap);
+                                        int stride = fpdfview.FPDFBitmapGetStride(bitmap);
+
+                                        using (var bmp = new System.Drawing.Bitmap(renderWidth, renderHeight, stride, System.Drawing.Imaging.PixelFormat.Format32bppArgb, buffer))
+                                        {
+                                            using (var ms = new System.IO.MemoryStream())
+                                            {
+                                                bmp.RotateFlip(System.Drawing.RotateFlipType.Rotate180FlipX);
+                                                bmp.Save(ms, System.Drawing.Imaging.ImageFormat.Png);
+                                                ms.Position = 0;
+
+                                                var imagePart = slidePart.AddNewPart<ImagePart>("image/png", $"rId2");
+                                                imagePart.FeedData(ms);
+                                            }
+                                        }
+                                    }
+                                    finally
+                                    {
+                                        fpdfview.FPDF_ClosePage(page);
+                                    }
                                 }
+
+                                GenerateSlidePartContent(slidePart, slideNum);
+
+                                slidePart.AddPart(slideLayoutPart, "rId1");
+
+                                var newSlideId = new P.SlideId() { Id = (uint)(255 + slideNum), RelationshipId = presentationPart.GetIdOfPart(slidePart) };
+                                slideIdList.Append(newSlideId);
                             }
 
-                            GenerateSlidePartContent(slidePart, slideNum);
-
-                            slidePart.AddPart(slideLayoutPart, "rId1");
-
-                            var newSlideId = new P.SlideId() { Id = (uint)(255 + slideNum), RelationshipId = presentationPart.GetIdOfPart(slidePart) };
-                            slideIdList.Append(newSlideId);
+                            presentationPart.Presentation.Save();
                         }
 
-                        presentationPart.Presentation.Save();
+                        MessageBox.Show($"PowerPoint 导出完成！共 {pageCount} 页，已保存到: {outputPath}", "完成", MessageBoxButton.OK, MessageBoxImage.Information);
+                    }
+                    finally
+                    {
+                        fpdfview.FPDF_CloseDocument(doc);
                     }
                 }
-
-                MessageBox.Show($"PowerPoint 导出完成！共 {pageCount} 页，已保存到: {outputPath}", "完成", MessageBoxButton.OK, MessageBoxImage.Information);
+                finally
+                {
+                    fpdfview.FPDF_DestroyLibrary();
+                }
             }
             catch (Exception ex)
             {

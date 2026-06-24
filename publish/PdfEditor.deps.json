@@ -14,7 +14,7 @@
           "EPPlus": "5.8.10",
           "Microsoft.Web.WebView2": "1.0.2535.41",
           "PDFiumCore": "151.0.7891",
-          "PdfiumViewer": "2.13.0",
+          "System.Drawing.Common": "8.0.8",
           "iTextSharp": "5.5.13.3",
           "PdfWrapper": "0.0.0.0",
           "runtimepack.Microsoft.NETCore.App.Runtime.win-x64": "9.0.17",
@@ -986,7 +986,7 @@
         "dependencies": {
           "Microsoft.Extensions.Configuration.Json": "5.0.0",
           "Microsoft.IO.RecyclableMemoryStream": "1.4.1",
-          "System.Drawing.Common": "5.0.0"
+          "System.Drawing.Common": "8.0.8"
         },
         "runtime": {
           "lib/net5.0/EPPlus.dll": {
@@ -1138,24 +1138,11 @@
           }
         }
       },
-      "PdfiumViewer/2.13.0": {
+      "System.Drawing.Common/8.0.8": {
         "runtime": {
-          "lib/net20/PdfiumViewer.dll": {
-            "assemblyVersion": "2.13.0.0",
-            "fileVersion": "2.13.0.0"
-          }
-        },
-        "resources": {
-          "lib/net20/nl/PdfiumViewer.resources.dll": {
-            "locale": "nl"
-          }
-        }
-      },
-      "System.Drawing.Common/5.0.0": {
-        "runtime": {
-          "runtimes/win/lib/netcoreapp3.0/System.Drawing.Common.dll": {
-            "assemblyVersion": "5.0.0.0",
-            "fileVersion": "5.0.20.51904"
+          "lib/net8.0/System.Drawing.Common.dll": {
+            "assemblyVersion": "8.0.0.0",
+            "fileVersion": "8.0.824.36606"
           }
         }
       },
@@ -1304,19 +1291,12 @@
       "path": "pdfiumcore/151.0.7891",
       "hashPath": "pdfiumcore.151.0.7891.nupkg.sha512"
     },
-    "PdfiumViewer/2.13.0": {
+    "System.Drawing.Common/8.0.8": {
       "type": "package",
       "serviceable": true,
-      "sha512": "sha512-Nw4owBmJzDVXoMRjCnqPbET07CPOawwhcNjt+PyRaSxONN9bsFF+cm9kcMsDLEAEaxsiDJo5jls8bCQjvjidkA==",
-      "path": "pdfiumviewer/2.13.0",
-      "hashPath": "pdfiumviewer.2.13.0.nupkg.sha512"
-    },
-    "System.Drawing.Common/5.0.0": {
-      "type": "package",
-      "serviceable": true,
-      "sha512": "sha512-SztFwAnpfKC8+sEKXAFxCBWhKQaEd97EiOL7oZJZP56zbqnLpmxACWA8aGseaUExciuEAUuR9dY8f7HkTRAdnw==",
-      "path": "system.drawing.common/5.0.0",
-      "hashPath": "system.drawing.common.5.0.0.nupkg.sha512"
+      "sha512": "sha512-4ZM1wvLjz9nVVExsfPAaSl/qOvU+QNedJL5rQ+2Wbow+iGeyO0e7XN07707rMBgaffEeeLrCZBwC0oHUuvRdPw==",
+      "path": "system.drawing.common/8.0.8",
+      "hashPath": "system.drawing.common.8.0.8.nupkg.sha512"
     },
     "PdfWrapper/0.0.0.0": {
       "type": "reference",
