@@ -14,8 +14,8 @@
 ## 技术栈
 
 - **框架**: .NET 9.0 Windows (WPF)
-- **PDF 处理**: PoDoFo (C++ PDF 库，通过 C++/CLI 包装)
-- **Word 导出**: Xceed.Words.NET
+- **PDF 处理**: PoDoFo (C++ PDF 库，通过 C++/CLI 包装)、iTextSharp (文本提取、合并)
+- **Word 导出**: DocumentFormat.OpenXml (OpenXML SDK)
 - **Excel 导出**: EPPlus 5.8.10
 - **PowerPoint 导出**: DocumentFormat.OpenXml 3.0.2
 - **PDF 预览**: WebView2 + PDF.js

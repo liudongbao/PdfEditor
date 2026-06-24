@@ -13,7 +13,6 @@
           "DocumentFormat.OpenXml": "3.0.2",
           "EPPlus": "5.8.10",
           "Microsoft.Web.WebView2": "1.0.2535.41",
-          "Xceed.Words.NET": "4.0.25103.5744",
           "iTextSharp": "5.5.13.3",
           "PdfWrapper": "0.0.0.0",
           "runtimepack.Microsoft.NETCore.App.Runtime.win-x64": "9.0.17",
@@ -1119,75 +1118,11 @@
           }
         }
       },
-      "SkiaSharp/2.88.8": {
-        "dependencies": {
-          "SkiaSharp.NativeAssets.Win32": "2.88.8"
-        },
-        "runtime": {
-          "lib/net6.0/SkiaSharp.dll": {
-            "assemblyVersion": "2.88.0.0",
-            "fileVersion": "2.88.8.0"
-          }
-        }
-      },
-      "SkiaSharp.NativeAssets.Win32/2.88.8": {
-        "native": {
-          "runtimes/win-x64/native/libSkiaSharp.dll": {
-            "fileVersion": "0.0.0.0"
-          }
-        }
-      },
       "System.Drawing.Common/5.0.0": {
         "runtime": {
           "runtimes/win/lib/netcoreapp3.0/System.Drawing.Common.dll": {
             "assemblyVersion": "5.0.0.0",
             "fileVersion": "5.0.20.51904"
-          }
-        }
-      },
-      "Xceed.Document.NET/4.0.25103.5744": {
-        "dependencies": {
-          "Xceed.Drawing.NET": "1.0.25103.5744",
-          "Xceed.Pdf": "4.0.25103.5744"
-        },
-        "runtime": {
-          "lib/net5.0/Xceed.Document.NET.dll": {
-            "assemblyVersion": "4.0.25103.5744",
-            "fileVersion": "4.0.25103.5744"
-          }
-        }
-      },
-      "Xceed.Drawing.NET/1.0.25103.5744": {
-        "dependencies": {
-          "SkiaSharp": "2.88.8"
-        },
-        "runtime": {
-          "lib/net5.0/Xceed.Drawing.NET.dll": {
-            "assemblyVersion": "1.0.25103.5744",
-            "fileVersion": "1.0.25103.5744"
-          }
-        }
-      },
-      "Xceed.Pdf/4.0.25103.5744": {
-        "dependencies": {
-          "Xceed.Drawing.NET": "1.0.25103.5744"
-        },
-        "runtime": {
-          "lib/net5.0/Xceed.PDF.NET.dll": {
-            "assemblyVersion": "4.0.25103.5744",
-            "fileVersion": "4.0.25103.5744"
-          }
-        }
-      },
-      "Xceed.Words.NET/4.0.25103.5744": {
-        "dependencies": {
-          "Xceed.Document.NET": "4.0.25103.5744",
-          "Xceed.Drawing.NET": "1.0.25103.5744"
-        },
-        "runtime": {
-          "lib/net5.0/Xceed.Words.NET.dll": {
-            "assemblyVersion": "4.0.25103.5744",
-            "fileVersion": "4.0.25103.5744"
           }
         }
       },
@@ -1322,54 +1257,12 @@
       "path": "microsoft.web.webview2/1.0.2535.41",
       "hashPath": "microsoft.web.webview2.1.0.2535.41.nupkg.sha512"
     },
-    "SkiaSharp/2.88.8": {
-      "type": "package",
-      "serviceable": true,
-      "sha512": "sha512-bRkp3uKp5ZI8gXYQT57uKwil1uobb2p8c69n7v5evlB/2JNcMAXVcw9DZAP5Ig3WSvgzGm2YSn27UVeOi05NlA==",
-      "path": "skiasharp/2.88.8",
-      "hashPath": "skiasharp.2.88.8.nupkg.sha512"
-    },
-    "SkiaSharp.NativeAssets.Win32/2.88.8": {
-      "type": "package",
-      "serviceable": true,
-      "sha512": "sha512-O9QXoWEXA+6cweR4h3BOnwMz+pO9vL9mXdjLrpDd0w1QzCgWmLQBxa1VgySDITiH7nQndrDG1h6937zm9pLj1Q==",
-      "path": "skiasharp.nativeassets.win32/2.88.8",
-      "hashPath": "skiasharp.nativeassets.win32.2.88.8.nupkg.sha512"
-    },
     "System.Drawing.Common/5.0.0": {
       "type": "package",
       "serviceable": true,
       "sha512": "sha512-SztFwAnpfKC8+sEKXAFxCBWhKQaEd97EiOL7oZJZP56zbqnLpmxACWA8aGseaUExciuEAUuR9dY8f7HkTRAdnw==",
       "path": "system.drawing.common/5.0.0",
       "hashPath": "system.drawing.common.5.0.0.nupkg.sha512"
-    },
-    "Xceed.Document.NET/4.0.25103.5744": {
-      "type": "package",
-      "serviceable": true,
-      "sha512": "sha512-njcRTbeSZGYWE6sm0PxLyhuXrbyvSkjN6H0QDH3z1y4cB55YSn6Snvhd193AIBwAhMclMp0aUgyD9ZRWpJhs2Q==",
-      "path": "xceed.document.net/4.0.25103.5744",
-      "hashPath": "xceed.document.net.4.0.25103.5744.nupkg.sha512"
-    },
-    "Xceed.Drawing.NET/1.0.25103.5744": {
-      "type": "package",
-      "serviceable": true,
-      "sha512": "sha512-ZGE6KAMGqoOdcDnzbuwNpUxNqzIqQN5bulE2N7KMJTuYVKAY3JiqImXsqKJ59HW4AyT7grfJAGbK9dqosfW7zA==",
-      "path": "xceed.drawing.net/1.0.25103.5744",
-      "hashPath": "xceed.drawing.net.1.0.25103.5744.nupkg.sha512"
-    },
-    "Xceed.Pdf/4.0.25103.5744": {
-      "type": "package",
-      "serviceable": true,
-      "sha512": "sha512-KrV51WJ9Rf/BTjQugW8oYFQwOUyVfxC6tchxQNWE81CNufMfa3+FEf1k+ob3PP6HHBM9vix0JNlUF3FUWMWI6g==",
-      "path": "xceed.pdf/4.0.25103.5744",
-      "hashPath": "xceed.pdf.4.0.25103.5744.nupkg.sha512"
-    },
-    "Xceed.Words.NET/4.0.25103.5744": {
-      "type": "package",
-      "serviceable": true,
-      "sha512": "sha512-nSe3LEB/1mhZt59vmzRvCYrN+ZBuAfQwQ9Tcj80S78rsXua8ScmHkmZMm1qW4+6nnSaGJQhXYx30o/MWfyip6w==",
-      "path": "xceed.words.net/4.0.25103.5744",
-      "hashPath": "xceed.words.net.4.0.25103.5744.nupkg.sha512"
     },
     "PdfWrapper/0.0.0.0": {
       "type": "reference",
