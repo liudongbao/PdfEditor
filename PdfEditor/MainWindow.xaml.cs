@@ -17,6 +17,7 @@ using DocumentFormat.OpenXml.Packaging;
 using W = DocumentFormat.OpenXml.Wordprocessing;
 using P = DocumentFormat.OpenXml.Presentation;
 using D = DocumentFormat.OpenXml.Drawing;
+using PdfiumViewer;
 
 namespace PdfEditor
 {

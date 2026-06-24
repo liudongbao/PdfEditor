@@ -13,6 +13,7 @@
           "DocumentFormat.OpenXml": "3.0.2",
           "EPPlus": "5.8.10",
           "Microsoft.Web.WebView2": "1.0.2535.41",
+          "PDFiumCore": "151.0.7891",
           "PdfiumViewer": "2.13.0",
           "iTextSharp": "5.5.13.3",
           "PdfWrapper": "0.0.0.0",
@@ -947,6 +948,13 @@
           }
         }
       },
+      "bblanchon.PDFium.Win32/151.0.7891": {
+        "native": {
+          "runtimes/win-x64/native/pdfium.dll": {
+            "fileVersion": "151.0.7891.0"
+          }
+        }
+      },
       "BouncyCastle/1.8.9": {
         "runtime": {
           "lib/BouncyCastle.Crypto.dll": {
@@ -1119,6 +1127,17 @@
           }
         }
       },
+      "PDFiumCore/151.0.7891": {
+        "dependencies": {
+          "bblanchon.PDFium.Win32": "151.0.7891"
+        },
+        "runtime": {
+          "lib/net8.0/PDFiumCore.dll": {
+            "assemblyVersion": "151.0.7891.0",
+            "fileVersion": "151.0.7891.0"
+          }
+        }
+      },
       "PdfiumViewer/2.13.0": {
         "runtime": {
           "lib/net20/PdfiumViewer.dll": {
@@ -1165,6 +1184,13 @@
       "type": "runtimepack",
       "serviceable": false,
       "sha512": ""
+    },
+    "bblanchon.PDFium.Win32/151.0.7891": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-6VgjEYEYEz89IGYS5xQgQt3RUs1QKvX/xWUkyC2FZwf45oJi67arg0SRYM24nHr4e+0ure9/Gcwkct1Ot0kaQw==",
+      "path": "bblanchon.pdfium.win32/151.0.7891",
+      "hashPath": "bblanchon.pdfium.win32.151.0.7891.nupkg.sha512"
     },
     "BouncyCastle/1.8.9": {
       "type": "package",
@@ -1270,6 +1296,13 @@
       "sha512": "sha512-E3rAxpp2GVtg99wlRBjIM5YeCXFvhPQuHGn/rfxjAJLNbKfiflliljtY/aJBkMmCzf/KmDhTTmU1hoOsEtuW+Q==",
       "path": "microsoft.web.webview2/1.0.2535.41",
       "hashPath": "microsoft.web.webview2.1.0.2535.41.nupkg.sha512"
+    },
+    "PDFiumCore/151.0.7891": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-AD38qF7B/0w4KaUU48ytzuiChjtOboKBTus/ynHrbhNSztY6/hzESyhERGMvw8LhnOd8LK+usblqgHFJBKRfOw==",
+      "path": "pdfiumcore/151.0.7891",
+      "hashPath": "pdfiumcore.151.0.7891.nupkg.sha512"
     },
     "PdfiumViewer/2.13.0": {
       "type": "package",
