@@ -1067,91 +1067,329 @@ namespace PdfEditor
             try
             {
                 string text = ExtractTextFromPdf(ExportPdfPath.Text);
-                using (PresentationDocument presentationDocument = PresentationDocument.Create(outputPath, PresentationDocumentType.Presentation))
+                string[] paragraphs = text.Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
+
+                using (FileStream fs = new FileStream(outputPath, FileMode.Create))
+                using (System.IO.Compression.ZipArchive zip = new System.IO.Compression.ZipArchive(fs, System.IO.Compression.ZipArchiveMode.Create))
                 {
-                    PresentationPart presentationPart = presentationDocument.AddPresentationPart();
-                    presentationPart.Presentation = new P.Presentation();
+                    const int linesPerSlide = 20;
+                    int totalSlides = (int)Math.Ceiling((double)paragraphs.Length / linesPerSlide);
+                    if (totalSlides == 0) totalSlides = 1;
 
-                    SlideMasterPart slideMasterPart = presentationPart.AddNewPart<SlideMasterPart>();
-                    slideMasterPart.SlideMaster = new P.SlideMaster();
-                    slideMasterPart.SlideMaster.CommonSlideData = new P.CommonSlideData();
-                    slideMasterPart.SlideMaster.CommonSlideData.ShapeTree = new P.ShapeTree();
+                    CreateZipEntry(zip, "[Content_Types].xml", GetContentTypesXml(totalSlides));
+                    CreateZipEntry(zip, "_rels/.rels", GetRootRelsXml());
+                    CreateZipEntry(zip, "ppt/presentation.xml", GetPresentationXml(totalSlides));
+                    CreateZipEntry(zip, "ppt/_rels/presentation.xml.rels", GetPresentationRelsXml(totalSlides));
+                    CreateZipEntry(zip, "ppt/slideMasters/slideMaster1.xml", GetSlideMasterXml());
+                    CreateZipEntry(zip, "ppt/slideMasters/_rels/slideMaster1.xml.rels", GetSlideMasterRelsXml());
+                    CreateZipEntry(zip, "ppt/slideLayouts/slideLayout1.xml", GetSlideLayoutXml());
+                    CreateZipEntry(zip, "ppt/theme/theme1.xml", GetThemeXml());
+                    CreateZipEntry(zip, "ppt/presProps.xml", GetPresPropsXml());
+                    CreateZipEntry(zip, "ppt/viewProps.xml", GetViewPropsXml());
+                    CreateZipEntry(zip, "ppt/tableStyles.xml", GetTableStylesXml());
+                    CreateZipEntry(zip, "docProps/core.xml", GetCoreXml());
+                    CreateZipEntry(zip, "docProps/app.xml", GetAppXml(totalSlides));
 
-                    P.Shape shape = new P.Shape();
-                    shape.NonVisualShapeProperties = new P.NonVisualShapeProperties();
-                    shape.NonVisualShapeProperties.NonVisualDrawingProperties = new P.NonVisualDrawingProperties { Id = 1, Name = "Title" };
-                    shape.NonVisualShapeProperties.NonVisualShapeDrawingProperties = new P.NonVisualShapeDrawingProperties();
-                    shape.NonVisualShapeProperties.ApplicationNonVisualDrawingProperties = new P.ApplicationNonVisualDrawingProperties();
-                    shape.ShapeProperties = new P.ShapeProperties();
-                    slideMasterPart.SlideMaster.CommonSlideData.ShapeTree.Append(shape);
-
-                    SlideLayoutPart slideLayoutPart = slideMasterPart.AddNewPart<SlideLayoutPart>();
-                    slideLayoutPart.SlideLayout = new P.SlideLayout();
-                    slideLayoutPart.SlideLayout.CommonSlideData = new P.CommonSlideData();
-                    slideLayoutPart.SlideLayout.CommonSlideData.ShapeTree = new P.ShapeTree();
-
-                    string[] paragraphs = text.Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
-                    List<SlidePart> slideParts = new List<SlidePart>();
-                    
-                    SlidePart slidePart = presentationPart.AddNewPart<SlidePart>();
-                    slideParts.Add(slidePart);
-                    slidePart.Slide = new P.Slide();
-                    slidePart.Slide.CommonSlideData = new P.CommonSlideData();
-                    slidePart.Slide.CommonSlideData.ShapeTree = new P.ShapeTree();
-                    slidePart.AddPart(slideLayoutPart);
-
-                    double top = 50;
-                    uint shapeId = 1;
-                    foreach (string paragraph in paragraphs.Take(50))
+                    int paraIndex = 0;
+                    for (int slideNum = 1; slideNum <= totalSlides; slideNum++)
                     {
-                        P.Shape textShape = new P.Shape();
-                        textShape.NonVisualShapeProperties = new P.NonVisualShapeProperties();
-                        textShape.NonVisualShapeProperties.NonVisualDrawingProperties = new P.NonVisualDrawingProperties { Id = shapeId, Name = "Text" + shapeId };
-                        textShape.NonVisualShapeProperties.NonVisualShapeDrawingProperties = new P.NonVisualShapeDrawingProperties();
-                        textShape.NonVisualShapeProperties.ApplicationNonVisualDrawingProperties = new P.ApplicationNonVisualDrawingProperties();
-                        textShape.ShapeProperties = new P.ShapeProperties();
-                        textShape.ShapeProperties.Transform2D = new D.Transform2D();
-                        textShape.ShapeProperties.Transform2D.Offset = new D.Offset { X = 500000, Y = (long)(top * 9525) };
-                        textShape.ShapeProperties.Transform2D.Extents = new D.Extents { Cx = 8000000, Cy = 500000 };
-                        textShape.TextBody = new P.TextBody();
-                        textShape.TextBody.BodyProperties = new D.BodyProperties();
-                        textShape.TextBody.ListStyle = new D.ListStyle();
-                        textShape.TextBody.Append(new D.Paragraph(new D.Run(new D.Text(paragraph))));
-                        slidePart.Slide.CommonSlideData.ShapeTree.Append(textShape);
-                        shapeId++;
-                        top += 25;
-                        if (top > 600)
+                        List<string> slideLines = new List<string>();
+                        for (int i = 0; i < linesPerSlide && paraIndex < paragraphs.Length; i++, paraIndex++)
                         {
-                            slidePart = presentationPart.AddNewPart<SlidePart>();
-                            slideParts.Add(slidePart);
-                            slidePart.Slide = new P.Slide();
-                            slidePart.Slide.CommonSlideData = new P.CommonSlideData();
-                            slidePart.Slide.CommonSlideData.ShapeTree = new P.ShapeTree();
-                            slidePart.AddPart(slideLayoutPart);
-                            top = 50;
-                            shapeId = 1;
+                            slideLines.Add(EscapeXml(paragraphs[paraIndex]));
                         }
+                        CreateZipEntry(zip, $"ppt/slides/slide{slideNum}.xml", GetSlideXml(slideLines, slideNum));
+                        CreateZipEntry(zip, $"ppt/slides/_rels/slide{slideNum}.xml.rels", GetSlideRelsXml());
                     }
-
-                    presentationPart.Presentation.SlideIdList = new P.SlideIdList();
-                    uint slideIndex = 256;
-                    foreach (var slide in slideParts)
-                    {
-                        P.SlideId slideId = new P.SlideId();
-                        slideId.Id = slideIndex;
-                        slideId.RelationshipId = presentationPart.GetIdOfPart(slide);
-                        presentationPart.Presentation.SlideIdList.Append(slideId);
-                        slideIndex++;
-                    }
-
-                    presentationPart.Presentation.Save();
                 }
+
                 MessageBox.Show($"PowerPoint 导出完成！已保存到: {outputPath}", "完成", MessageBoxButton.OK, MessageBoxImage.Information);
             }
             catch (Exception ex)
             {
                 MessageBox.Show($"PowerPoint 导出失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
             }
+        }
+
+        private static void CreateZipEntry(System.IO.Compression.ZipArchive zip, string entryName, string content)
+        {
+            var entry = zip.CreateEntry(entryName);
+            using (var stream = entry.Open())
+            using (var writer = new StreamWriter(stream, System.Text.Encoding.UTF8))
+            {
+                writer.Write(content);
+            }
+        }
+
+        private static string EscapeXml(string text)
+        {
+            return text.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;").Replace("\"", "&quot;").Replace("'", "&apos;");
+        }
+
+        private static string GetContentTypesXml(int slideCount)
+        {
+            string overrides = "";
+            for (int i = 1; i <= slideCount; i++)
+            {
+                overrides += $"<Override PartName=\"/ppt/slides/slide{i}.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.presentationml.slide+xml\"/>";
+            }
+            return $@"<?xml version=""1.0"" encoding=""UTF-8"" standalone=""yes""?>
+<Types xmlns=""http://schemas.openxmlformats.org/package/2006/content-types"">
+<Default Extension=""rels"" ContentType=""application/vnd.openxmlformats-package.relationships+xml""/>
+<Default Extension=""xml"" ContentType=""application/xml""/>
+<Override PartName=""/ppt/presentation.xml"" ContentType=""application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml""/>
+<Override PartName=""/ppt/slideMasters/slideMaster1.xml"" ContentType=""application/vnd.openxmlformats-officedocument.presentationml.slideMaster+xml""/>
+<Override PartName=""/ppt/slideLayouts/slideLayout1.xml"" ContentType=""application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml""/>
+<Override PartName=""/ppt/theme/theme1.xml"" ContentType=""application/vnd.openxmlformats-officedocument.theme+xml""/>
+<Override PartName=""/ppt/presProps.xml"" ContentType=""application/vnd.openxmlformats-officedocument.presentationml.presProps+xml""/>
+<Override PartName=""/ppt/viewProps.xml"" ContentType=""application/vnd.openxmlformats-officedocument.presentationml.viewProps+xml""/>
+<Override PartName=""/ppt/tableStyles.xml"" ContentType=""application/vnd.openxmlformats-officedocument.presentationml.tableStyles+xml""/>
+<Override PartName=""/docProps/core.xml"" ContentType=""application/vnd.openxmlformats-package.core-properties+xml""/>
+<Override PartName=""/docProps/app.xml"" ContentType=""application/vnd.openxmlformats-officedocument.extended-properties+xml""/>
+{overrides}
+</Types>";
+        }
+
+        private static string GetRootRelsXml()
+        {
+            return @"<?xml version=""1.0"" encoding=""UTF-8"" standalone=""yes""?>
+<Relationships xmlns=""http://schemas.openxmlformats.org/package/2006/relationships"">
+<Relationship Id=""rId1"" Type=""http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument"" Target=""ppt/presentation.xml""/>
+<Relationship Id=""rId2"" Type=""http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties"" Target=""docProps/core.xml""/>
+<Relationship Id=""rId3"" Type=""http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties"" Target=""docProps/app.xml""/>
+</Relationships>";
+        }
+
+        private static string GetPresentationXml(int slideCount)
+        {
+            string sldIds = "";
+            for (int i = 1; i <= slideCount; i++)
+            {
+                sldIds += $"<p:sldId id=\"{255 + i}\" r:id=\"rId{i + 10}\"/>";
+            }
+            return $@"<?xml version=""1.0"" encoding=""UTF-8"" standalone=""yes""?>
+<p:presentation xmlns:a=""http://schemas.openxmlformats.org/drawingml/2006/main"" xmlns:r=""http://schemas.openxmlformats.org/officeDocument/2006/relationships"" xmlns:p=""http://schemas.openxmlformats.org/presentationml/2006/main"">
+<p:sldMasterIdLst><p:sldMasterId id=""2147483648"" r:id=""rId1""/></p:sldMasterIdLst>
+<p:sldIdLst>{sldIds}</p:sldIdLst>
+<p:sldSz cx=""9144000"" cy=""6858000"" type=""screen4x3""/>
+<p:notesSz cx=""6858000"" cy=""9144000""/>
+<p:defaultTextStyle>
+<a:defPPr><a:defRPr lang=""zh-CN""/></a:defPPr>
+<a:lvl1pPr marL=""0"" indent=""0""><a:defRPr sz=""1800""/></a:lvl1pPr>
+</p:defaultTextStyle>
+</p:presentation>";
+        }
+
+        private static string GetPresentationRelsXml(int slideCount)
+        {
+            string rels = "<Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideMaster\" Target=\"slideMasters/slideMaster1.xml\"/>";
+            for (int i = 1; i <= slideCount; i++)
+            {
+                rels += $"<Relationship Id=\"rId{i + 10}\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide\" Target=\"slides/slide{i}.xml\"/>";
+            }
+            rels += "<Relationship Id=\"rId2\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/presProps\" Target=\"presProps.xml\"/>";
+            rels += "<Relationship Id=\"rId3\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/viewProps\" Target=\"viewProps.xml\"/>";
+            rels += "<Relationship Id=\"rId4\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/tableStyles\" Target=\"tableStyles.xml\"/>";
+            return $@"<?xml version=""1.0"" encoding=""UTF-8"" standalone=""yes""?>
+<Relationships xmlns=""http://schemas.openxmlformats.org/package/2006/relationships"">
+{rels}
+</Relationships>";
+        }
+
+        private static string GetSlideMasterXml()
+        {
+            return @"<?xml version=""1.0"" encoding=""UTF-8"" standalone=""yes""?>
+<p:sldMaster xmlns:a=""http://schemas.openxmlformats.org/drawingml/2006/main"" xmlns:r=""http://schemas.openxmlformats.org/officeDocument/2006/relationships"" xmlns:p=""http://schemas.openxmlformats.org/presentationml/2006/main"">
+<p:cSld>
+<p:bg><p:bgPr><a:solidFill><a:srgbClr val=""FFFFFF""/></a:solidFill><a:effectLst/></p:bgPr></p:bg>
+<p:spTree>
+<p:nvGrpSpPr><p:cNvPr id=""1"" name=""""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>
+<p:grpSpPr><a:xfrm><a:off x=""0"" y=""0""/><a:ext cx=""0"" cy=""0""/><a:chOff x=""0"" y=""0""/><a:chExt cx=""0"" cy=""/></a:xfrm></p:grpSpPr>
+</p:spTree>
+</p:cSld>
+<p:clrMap bg1=""lt1"" tx1=""dk1"" bg2=""lt2"" tx2=""dk2"" accent1=""accent1"" accent2=""accent2"" accent3=""accent3"" accent4=""accent4"" accent5=""accent5"" accent6=""accent6"" hlink=""hlink"" folHlink=""folHlink""/>
+<p:sldLayoutIdLst><p:sldLayoutId id=""2147483649"" r:id=""rId1""/></p:sldLayoutIdLst>
+<p:txStyles>
+<p:titleStyle><a:lvl1pPr><a:defRPr sz=""4400"" b=""1""/></a:lvl1pPr></p:titleStyle>
+<p:bodyStyle><a:lvl1pPr marL=""342900"" indent=""-342900""><a:defRPr sz=""1800""/></a:lvl1pPr></p:bodyStyle>
+<p:otherStyle><a:lvl1pPr><a:defRPr sz=""1800""/></a:lvl1pPr></p:otherStyle>
+</p:txStyles>
+</p:sldMaster>";
+        }
+
+        private static string GetSlideMasterRelsXml()
+        {
+            return @"<?xml version=""1.0"" encoding=""UTF-8"" standalone=""yes""?>
+<Relationships xmlns=""http://schemas.openxmlformats.org/package/2006/relationships"">
+<Relationship Id=""rId1"" Type=""http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout"" Target=""../slideLayouts/slideLayout1.xml""/>
+<Relationship Id=""rId2"" Type=""http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme"" Target=""../theme/theme1.xml""/>
+</Relationships>";
+        }
+
+        private static string GetSlideLayoutXml()
+        {
+            return @"<?xml version=""1.0"" encoding=""UTF-8"" standalone=""yes""?>
+<p:sldLayout xmlns:a=""http://schemas.openxmlformats.org/drawingml/2006/main"" xmlns:r=""http://schemas.openxmlformats.org/officeDocument/2006/relationships"" xmlns:p=""http://schemas.openxmlformats.org/presentationml/2006/main"" type=""blank"">
+<p:cSld name=""空白"">
+<p:spTree>
+<p:nvGrpSpPr><p:cNvPr id=""1"" name=""""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>
+<p:grpSpPr><a:xfrm><a:off x=""0"" y=""0""/><a:ext cx=""0"" cy=""0""/><a:chOff x=""0"" y=""0""/><a:chExt cx=""0"" cy=""/></a:xfrm></p:grpSpPr>
+</p:spTree>
+</p:cSld>
+<p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr>
+</p:sldLayout>";
+        }
+
+        private static string GetThemeXml()
+        {
+            return @"<?xml version=""1.0"" encoding=""UTF-8"" standalone=""yes""?>
+<a:theme xmlns:a=""http://schemas.openxmlformats.org/drawingml/2006/main"" name=""Office Theme"">
+<a:themeElements>
+<a:clrScheme name=""Office"">
+<a:dk1><a:sysClr val=""windowText"" lastClr=""000000""/></a:dk1>
+<a:lt1><a:sysClr val=""window"" lastClr=""FFFFFF""/></a:lt1>
+<a:dk2><a:srgbClr val=""1F497D""/></a:dk2>
+<a:lt2><a:srgbClr val=""EEECE1""/></a:lt2>
+<a:accent1><a:srgbClr val=""4F81BD""/></a:accent1>
+<a:accent2><a:srgbClr val=""C0504D""/></a:accent2>
+<a:accent3><a:srgbClr val=""9BBB59""/></a:accent3>
+<a:accent4><a:srgbClr val=""8064A2""/></a:accent4>
+<a:accent5><a:srgbClr val=""4BACC6""/></a:accent5>
+<a:accent6><a:srgbClr val=""F79646""/></a:accent6>
+<a:hlink><a:srgbClr val=""0000FF""/></a:hlink>
+<a:folHlink><a:srgbClr val=""800080""/></a:folHlink>
+</a:clrScheme>
+<a:fontScheme name=""Office"">
+<a:majorFont><a:latin typeface=""Calibri""/><a:ea typeface=""""/><a:cs typeface=""""/></a:majorFont>
+<a:minorFont><a:latin typeface=""Calibri""/><a:ea typeface=""""/><a:cs typeface=""""/></a:minorFont>
+</a:fontScheme>
+<a:fmtScheme name=""Office"">
+<a:fillStyleLst>
+<a:solidFill><a:schemeClr val=""phClr""/></a:solidFill>
+<a:gradFill rotWithShape=""1""><a:gsLst><a:gs pos=""0""><a:schemeClr val=""phClr""><a:tint val=""50000""/><a:satMod val=""300000""/></a:schemeClr></a:gs><a:gs pos=""35000""><a:schemeClr val=""phClr""><a:tint val=""37000""/><a:satMod val=""300000""/></a:schemeClr></a:gs><a:gs pos=""100000""><a:schemeClr val=""phClr""><a:tint val=""15000""/><a:satMod val=""350000""/></a:schemeClr></a:gs></a:gsLst><a:lin ang=""16200000"" scaled=""1""/></a:gradFill>
+</a:fillStyleLst>
+<a:lnStyleLst>
+<a:ln w=""9525"" cap=""flat"" cmpd=""sng"" algn=""ctr""><a:solidFill><a:schemeClr val=""phClr""><a:shade val=""95000""/><a:satMod val=""105000""/></a:schemeClr></a:solidFill><a:prstDash val=""solid""/><a:miter lim=""800000""/></a:ln>
+<a:ln w=""25400"" cap=""flat"" cmpd=""sng"" algn=""ctr""><a:solidFill><a:schemeClr val=""phClr""><a:shade val=""95000""/><a:satMod val=""105000""/></a:schemeClr></a:solidFill><a:prstDash val=""solid""/><a:miter lim=""800000""/></a:ln>
+<a:ln w=""38100"" cap=""flat"" cmpd=""sng"" algn=""ctr""><a:solidFill><a:schemeClr val=""phClr""><a:shade val=""95000""/><a:satMod val=""105000""/></a:schemeClr></a:solidFill><a:prstDash val=""solid""/><a:miter lim=""800000""/></a:ln>
+</a:lnStyleLst>
+<a:effectStyleLst>
+<a:effectStyle><a:effectLst><a:outerShdw blurRad=""40000"" dist=""20000"" dir=""5400000"" rotWithShape=""0""><a:srgbClr val=""000000""><a:alpha val=""38000""/></a:srgbClr></a:outerShdw></a:effectLst></a:effectStyle>
+<a:effectStyle><a:effectLst><a:outerShdw blurRad=""40000"" dist=""23000"" dir=""5400000"" rotWithShape=""0""><a:srgbClr val=""000000""><a:alpha val=""35000""/></a:srgbClr></a:outerShdw></a:effectLst></a:effectStyle>
+<a:effectStyle><a:effectLst><a:outerShdw blurRad=""40000"" dist=""23000"" dir=""5400000"" rotWithShape=""0""><a:srgbClr val=""000000""><a:alpha val=""35000""/></a:srgbClr></a:outerShdw></a:effectLst></a:effectStyle>
+</a:effectStyleLst>
+<a:bgFillStyleLst>
+<a:solidFill><a:schemeClr val=""phClr""/></a:solidFill>
+<a:solidFill><a:schemeClr val=""phClr""><a:tint val=""40000""/><a:satMod val=""300000""/></a:schemeClr></a:solidFill>
+<a:gradFill rotWithShape=""1""><a:gsLst><a:gs pos=""0""><a:schemeClr val=""phClr""><a:tint val=""40000""/><a:satMod val=""300000""/></a:schemeClr></a:gs><a:gs pos=""35000""><a:schemeClr val=""phClr""><a:tint val=""45000""/><a:satMod val=""290000""/></a:schemeClr></a:gs><a:gs pos=""100000""><a:schemeClr val=""phClr""><a:tint val=""20000""/><a:satMod val=""320000""/></a:schemeClr></a:gs></a:gsLst><a:lin ang=""16200000"" scaled=""0""/></a:gradFill>
+</a:bgFillStyleLst>
+</a:fmtScheme>
+</a:themeElements>
+<a:objectDefaults/>
+<a:extraClrSchemeLst/>
+</a:theme>";
+        }
+
+        private static string GetSlideXml(List<string> lines, int slideNum)
+        {
+            string shapes = "";
+            long y = 500000;
+            uint shapeId = 2;
+            foreach (string line in lines)
+            {
+                shapes += $@"<p:sp>
+<p:nvSpPr><p:cNvPr id=""{shapeId}"" name=""TextBox {shapeId}""/><p:cNvSpPr txBox=""1""/><p:nvPr/></p:nvSpPr>
+<p:spPr>
+<a:xfrm><a:off x=""500000"" y=""{y}""/><a:ext cx=""8000000"" cy=""300000""/></a:xfrm>
+<a:prstGeom prst=""rect""><a:avLst/></a:prstGeom>
+</p:spPr>
+<p:txBody>
+<a:bodyPr wrap=""square"" anchor=""t""><a:spAutoFit/></a:bodyPr>
+<a:lstStyle/>
+<a:p><a:r><a:rPr lang=""zh-CN"" sz=""1800"" dirty=""0""/><a:t>{line}</a:t></a:r></a:p>
+</p:txBody>
+</p:sp>";
+                y += 300000;
+                shapeId++;
+            }
+
+            return $@"<?xml version=""1.0"" encoding=""UTF-8"" standalone=""yes""?>
+<p:sld xmlns:a=""http://schemas.openxmlformats.org/drawingml/2006/main"" xmlns:r=""http://schemas.openxmlformats.org/officeDocument/2006/relationships"" xmlns:p=""http://schemas.openxmlformats.org/presentationml/2006/main"">
+<p:cSld>
+<p:spTree>
+<p:nvGrpSpPr><p:cNvPr id=""1"" name=""""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>
+<p:grpSpPr><a:xfrm><a:off x=""0"" y=""0""/><a:ext cx=""0"" cy=""0""/><a:chOff x=""0"" y=""0""/><a:chExt cx=""0"" cy=""/></a:xfrm></p:grpSpPr>
+{shapes}
+</p:spTree>
+</p:cSld>
+<p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr>
+</p:sld>";
+        }
+
+        private static string GetSlideRelsXml()
+        {
+            return @"<?xml version=""1.0"" encoding=""UTF-8"" standalone=""yes""?>
+<Relationships xmlns=""http://schemas.openxmlformats.org/package/2006/relationships"">
+<Relationship Id=""rId1"" Type=""http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout"" Target=""../slideLayouts/slideLayout1.xml""/>
+</Relationships>";
+        }
+
+        private static string GetPresPropsXml()
+        {
+            return @"<?xml version=""1.0"" encoding=""UTF-8"" standalone=""yes""?>
+<p:presentationPr xmlns:a=""http://schemas.openxmlformats.org/drawingml/2006/main"" xmlns:r=""http://schemas.openxmlformats.org/officeDocument/2006/relationships"" xmlns:p=""http://schemas.openxmlformats.org/presentationml/2006/main"">
+<p:showPr loop=""0"" showNarration=""1""><p:present><p:slideSz/></p:present></p:showPr>
+<p:extLst/>
+</p:presentationPr>";
+        }
+
+        private static string GetViewPropsXml()
+        {
+            return @"<?xml version=""1.0"" encoding=""UTF-8"" standalone=""yes""?>
+<p:viewPr xmlns:a=""http://schemas.openxmlformats.org/drawingml/2006/main"" xmlns:r=""http://schemas.openxmlformats.org/officeDocument/2006/relationships"" xmlns:p=""http://schemas.openxmlformats.org/presentationml/2006/main"" lastView=""sldView"">
+<p:normalViewPr><p:restoredLeft sz=""12063"" autoAdjust=""0""/><p:restoredTop sz=""94635"" autoAdjust=""0""/></p:normalViewPr>
+<p:slideViewPr><p:cSldViewPr><p:cViewPr><a:scale><a:sx n=""100"" d=""100""/><a:sy n=""100"" d=""100""/></a:scale><a:origin x=""0"" y=""0""/></p:cViewPr><p:guideLst/></p:cSldViewPr></p:slideViewPr>
+<p:notesTextViewPr><p:cViewPr><a:scale><a:sx n=""100"" d=""100""/><a:sy n=""100"" d=""100""/></a:scale><a:origin x=""0"" y=""0""/></p:cViewPr></p:notesTextViewPr>
+<p:gridSpacing cx=""720000"" cy=""720000""/>
+</p:viewPr>";
+        }
+
+        private static string GetTableStylesXml()
+        {
+            return @"<?xml version=""1.0"" encoding=""UTF-8"" standalone=""yes""?>
+<a:tblStyleLst xmlns:a=""http://schemas.openxmlformats.org/drawingml/2006/main"" def=""{5940675A-B579-460E-94D1-54222C63F5DA}""/>";
+        }
+
+        private static string GetCoreXml()
+        {
+            return @"<?xml version=""1.0"" encoding=""UTF-8"" standalone=""yes""?>
+<cp:coreProperties xmlns:cp=""http://schemas.openxmlformats.org/package/2006/metadata/core-properties"" xmlns:dc=""http://purl.org/dc/elements/1.1/"" xmlns:dcterms=""http://purl.org/dc/terms/"" xmlns:dcmitype=""http://purl.org/dc/dcmitype/"" xmlns:xsi=""http://www.w3.org/2001/XMLSchema-instance"">
+<dc:title></dc:title>
+<dc:creator>PdfEditor</dc:creator>
+<cp:lastModifiedBy>PdfEditor</cp:lastModifiedBy>
+<dcterms:created xsi:type=""dcterms:W3CDTF"">2024-01-01T00:00:00Z</dcterms:created>
+<dcterms:modified xsi:type=""dcterms:W3CDTF"">2024-01-01T00:00:00Z</dcterms:modified>
+</cp:coreProperties>";
+        }
+
+        private static string GetAppXml(int slideCount)
+        {
+            return $@"<?xml version=""1.0"" encoding=""UTF-8"" standalone=""yes""?>
+<Properties xmlns=""http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"" xmlns:vt=""http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes"">
+<Application>PdfEditor</Application>
+<Slides>{slideCount}</Slides>
+<Notes>0</Notes>
+<HiddenSlides>0</HiddenSlides>
+<MMClips>0</MMClips>
+<ScaleCrop>false</ScaleCrop>
+<HeadingPairs><vt:vector size=""2"" baseType=""variant""><vt:variant><vt:lpstr>幻灯片</vt:lpstr></vt:variant><vt:variant><vt:i4>{slideCount}</vt:i4></vt:variant></vt:vector></HeadingPairs>
+<TitlesOfParts><vt:vector size=""{slideCount}"" baseType=""lpstr"">{Enumerable.Range(1, slideCount).Select(i => $"<vt:lpstr>第{i}页</vt:lpstr>").Aggregate((a, b) => a + b)}</vt:vector></TitlesOfParts>
+<Company></Company>
+<LinksUpToDate>false</LinksUpToDate>
+<SharedDoc>false</SharedDoc>
+<HyperlinksChanged>false</HyperlinksChanged>
+<AppVersion>1.0</AppVersion>
+</Properties>";
         }
 
         private void SaveBookmarks_Click(object sender, RoutedEventArgs e)
