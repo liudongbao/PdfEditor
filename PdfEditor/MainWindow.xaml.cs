@@ -1072,7 +1072,7 @@ namespace PdfEditor
                     PresentationPart presentationPart = presentationDocument.AddPresentationPart();
                     presentationPart.Presentation = new P.Presentation();
 
-                    SlideMasterPart slideMasterPart = presentationPart.AddNewPart<SlideMasterPart>("rId1");
+                    SlideMasterPart slideMasterPart = presentationPart.AddNewPart<SlideMasterPart>();
                     slideMasterPart.SlideMaster = new P.SlideMaster();
                     slideMasterPart.SlideMaster.CommonSlideData = new P.CommonSlideData();
                     slideMasterPart.SlideMaster.CommonSlideData.ShapeTree = new P.ShapeTree();
@@ -1085,23 +1085,28 @@ namespace PdfEditor
                     shape.ShapeProperties = new P.ShapeProperties();
                     slideMasterPart.SlideMaster.CommonSlideData.ShapeTree.Append(shape);
 
-                    SlideLayoutPart slideLayoutPart = slideMasterPart.AddNewPart<SlideLayoutPart>("rId1");
+                    SlideLayoutPart slideLayoutPart = slideMasterPart.AddNewPart<SlideLayoutPart>();
                     slideLayoutPart.SlideLayout = new P.SlideLayout();
                     slideLayoutPart.SlideLayout.CommonSlideData = new P.CommonSlideData();
                     slideLayoutPart.SlideLayout.CommonSlideData.ShapeTree = new P.ShapeTree();
 
-                    SlidePart slidePart = presentationPart.AddNewPart<SlidePart>("rId2");
+                    string[] paragraphs = text.Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
+                    List<SlidePart> slideParts = new List<SlidePart>();
+                    
+                    SlidePart slidePart = presentationPart.AddNewPart<SlidePart>();
+                    slideParts.Add(slidePart);
                     slidePart.Slide = new P.Slide();
                     slidePart.Slide.CommonSlideData = new P.CommonSlideData();
                     slidePart.Slide.CommonSlideData.ShapeTree = new P.ShapeTree();
+                    slidePart.AddPart(slideLayoutPart);
 
-                    string[] paragraphs = text.Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
                     double top = 50;
+                    uint shapeId = 1;
                     foreach (string paragraph in paragraphs.Take(50))
                     {
                         P.Shape textShape = new P.Shape();
                         textShape.NonVisualShapeProperties = new P.NonVisualShapeProperties();
-                        textShape.NonVisualShapeProperties.NonVisualDrawingProperties = new P.NonVisualDrawingProperties { Id = (uint)(slidePart.Slide.CommonSlideData.ShapeTree.ChildElements.Count + 1), Name = "Text" };
+                        textShape.NonVisualShapeProperties.NonVisualDrawingProperties = new P.NonVisualDrawingProperties { Id = shapeId, Name = "Text" + shapeId };
                         textShape.NonVisualShapeProperties.NonVisualShapeDrawingProperties = new P.NonVisualShapeDrawingProperties();
                         textShape.NonVisualShapeProperties.ApplicationNonVisualDrawingProperties = new P.ApplicationNonVisualDrawingProperties();
                         textShape.ShapeProperties = new P.ShapeProperties();
@@ -1113,23 +1118,27 @@ namespace PdfEditor
                         textShape.TextBody.ListStyle = new D.ListStyle();
                         textShape.TextBody.Append(new D.Paragraph(new D.Run(new D.Text(paragraph))));
                         slidePart.Slide.CommonSlideData.ShapeTree.Append(textShape);
+                        shapeId++;
                         top += 25;
                         if (top > 600)
                         {
-                            slidePart = presentationPart.AddNewPart<SlidePart>("rId" + (presentationPart.SlideParts.Count() + 1));
+                            slidePart = presentationPart.AddNewPart<SlidePart>();
+                            slideParts.Add(slidePart);
                             slidePart.Slide = new P.Slide();
                             slidePart.Slide.CommonSlideData = new P.CommonSlideData();
                             slidePart.Slide.CommonSlideData.ShapeTree = new P.ShapeTree();
+                            slidePart.AddPart(slideLayoutPart);
                             top = 50;
+                            shapeId = 1;
                         }
                     }
 
                     presentationPart.Presentation.SlideIdList = new P.SlideIdList();
-                    int slideIndex = 1;
-                    foreach (var slide in presentationPart.SlideParts)
+                    uint slideIndex = 256;
+                    foreach (var slide in slideParts)
                     {
                         P.SlideId slideId = new P.SlideId();
-                        slideId.Id = (uint)(256 + slideIndex);
+                        slideId.Id = slideIndex;
                         slideId.RelationshipId = presentationPart.GetIdOfPart(slide);
                         presentationPart.Presentation.SlideIdList.Append(slideId);
                         slideIndex++;
