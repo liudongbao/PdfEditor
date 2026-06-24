@@ -28,6 +28,7 @@ namespace PdfWrapper
         int GetPageCount();
         System::Collections::Generic::List<PdfBookmark^>^ GetBookmarks();
         void AddBookmark(PdfBookmark^ bookmark);
+        void ClearBookmarks();
         void Save(System::String^ outputPath);
         static void Merge(cli::array<System::String^>^ pdfPaths, System::String^ outputPath);
 
@@ -37,6 +38,7 @@ namespace PdfWrapper
         
         void LoadBookmarks();
         void LoadBookmarksFromItem(void* item, System::Collections::Generic::List<PdfBookmark^>^ bookmarks);
-        void AddBookmarkToItem(void* parent, PdfBookmark^ bookmark);
+        void AddBookmarkToOutlines(void* outlines, PdfBookmark^ bookmark);
+        void AddBookmarkToOutlineItem(void* parent, PdfBookmark^ bookmark);
     };
 }

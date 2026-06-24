@@ -197,6 +197,7 @@ namespace PdfEditor
                         PageList.Items.Add($"第 {i + 1} 页");
                     }
                     
+                    bookmarkItems.Clear();
                     var outlines = pdfDoc.GetBookmarks();
                     if (outlines != null)
                     {
@@ -1146,6 +1147,8 @@ namespace PdfEditor
                 {
                     using (PdfWrapper.PdfDocument pdfDoc = new PdfWrapper.PdfDocument(currentPdfPath))
                     {
+                        pdfDoc.ClearBookmarks();
+                        
                         foreach (var item in bookmarkItems)
                         {
                             PdfWrapper.PdfBookmark bookmark = ConvertToPdfBookmark(item);
@@ -1159,6 +1162,11 @@ namespace PdfEditor
                     }
 
                     MessageBox.Show($"目录已保存到: {saveFileDialog.FileName}", "完成", MessageBoxButton.OK, MessageBoxImage.Information);
+                    
+                    string debugInfo = BookmarkDebug.CheckPdfBookmarks(saveFileDialog.FileName);
+                    string debugPath = Path.Combine(Path.GetDirectoryName(saveFileDialog.FileName), "bookmark_debug.txt");
+                    File.WriteAllText(debugPath, debugInfo);
+                    MessageBox.Show($"调试信息已保存到: {debugPath}", "调试信息", MessageBoxButton.OK, MessageBoxImage.Information);
                 }
                 catch (Exception ex)
                 {

@@ -177,7 +177,78 @@
 
 ---
 
-## 九、环境信息
+## 十、2026-06-24 开发记录
+
+### 书签功能修复（核心问题解决）
+
+#### 问题描述
+- 保存后的 PDF 书签在其他 PDF 阅读器（如 WPS、Adobe Reader）中无法正常显示和跳转
+- 原有的书签重复保存
+- 保存时报错 "Unknown error occurred while saving PDF"
+
+#### 解决方案演变
+
+##### 方案一：手动构建书签字典（失败）
+- 尝试直接操作 PDF 内部对象，手动创建 Outlines 字典
+- 问题：`PdfDictionary::AddKey` 参数类型不匹配导致保存失败
+- 问题：手动构建的结构可能不符合 PoDoFo 内部状态
+
+##### 方案二：使用 PoDoFo 标准 API（成功）
+- 使用 `PdfDocument::GetOrCreateOutlines()` 获取/创建书签根节点
+- 使用 `PdfOutlineItem::CreateChild()` 创建书签项
+- 使用 `PdfDocument::CreateDestination()` 创建跳转目标
+- 使用 `PdfDestination::SetDestination(page, PdfDestinationFit::Fit)` 设置目标页
+- 使用 `PdfOutlineItem::SetDestination()` 绑定目标到书签
+
+#### 关键代码修改
+- **PdfWrapper.h** - 新增 `ClearBookmarks()` 方法声明
+- **PdfWrapper.cpp** - 完全重写 `Save()` 方法和 `CreateBookmarkItem()` 辅助函数
+- **MainWindow.xaml.cs** - 修复书签重复问题：
+  - 打开 PDF 前调用 `bookmarkItems.Clear()`
+  - 保存前调用 `pdfDoc.ClearBookmarks()`
+
+#### 修复的问题列表
+1. ✅ 书签保存后在其他 PDF 阅读器中正常显示
+2. ✅ 书签跳转功能正常（使用 /Fit 模式）
+3. ✅ 中文标题正确编码（UTF-16BE 带 BOM）
+4. ✅ 书签不再重复保存
+5. ✅ 多级书签结构正确
+6. ✅ 保存不再报错
+
+### 技术要点
+- **PdfDestination 是私有构造函数**：必须通过 `doc->CreateDestination()` 创建
+- **PdfOutlines 操作标准流程**：GetOrCreateOutlines → CreateChild → SetDestination
+- **书签重复原因**：加载时不清空列表 + 保存时不清空内存书签，双重叠加
+- **日志调试**：日志文件位于 `C:\Users\Public\Documents\PdfWrapper.log`
+
+### 当前状态
+- ✅ 所有核心功能正常工作
+- ✅ PDF 合并功能正常
+- ✅ 页面编辑（删除、调整顺序）功能正常
+- ✅ 目录管理（可视化书签编辑）功能正常
+- ✅ 书签保存后在其他 PDF 阅读器中正常显示和跳转
+- ✅ 格式导出功能正常
+
+### Git 提交记录更新
+- 新增提交：修复书签保存问题，使用 PoDoFo 标准 API
+- 发布包已更新至 publish 目录
+
+---
+
+## 十一、项目里程碑
+
+| 阶段 | 完成时间 | 主要成果 |
+|------|----------|----------|
+| 项目启动 | 2026-06-22 | 需求确认，技术选型（.NET WPF） |
+| 初版完成 | 2026-06-22 | PDF 合并、页面编辑、格式导出、基础目录功能 |
+| 预览功能 | 2026-06-22 | WebView2 + PDF.js 页面预览，左右联动 |
+| 可视化书签 | 2026-06-22 | 目录管理标签页，可视化书签编辑 |
+| 架构升级 | 2026-06-23 | 引入 C++/CLI + PoDoFo 替代 iTextSharp |
+| 书签修复 | 2026-06-24 | 解决书签兼容性问题，所有功能正常 |
+
+---
+
+## 十二、环境信息
 
 - **操作系统:** Windows
 - **开发工具:** Visual Studio 2022 Build Tools
@@ -186,3 +257,5 @@
 - **平台工具集:** v143
 - **目标平台:** x64
 - **C++ 库管理:** vcpkg (podofo:x64-windows)
+- **版本控制:** Git
+- **远程仓库:** https://github.com/liudongbao/PdfEditor.git

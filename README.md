@@ -13,11 +13,12 @@
 
 ## 技术栈
 
-- **框架**: .NET 8.0 Windows (WPF)
-- **PDF 处理**: iTextSharp 5.5.13.3
+- **框架**: .NET 9.0 Windows (WPF)
+- **PDF 处理**: PoDoFo (C++ PDF 库，通过 C++/CLI 包装)
 - **Word 导出**: Xceed.Words.NET
 - **Excel 导出**: EPPlus 5.8.10
 - **PowerPoint 导出**: DocumentFormat.OpenXml 3.0.2
+- **PDF 预览**: WebView2 + PDF.js
 
 ## 使用方法
 
@@ -47,10 +48,15 @@ pdftool/
 ├── PdfEditor/           # WPF 项目源代码
 │   ├── App.xaml / .cs   # 应用程序入口
 │   ├── MainWindow.xaml / .cs  # 主窗口
-│   ├── BookmarkWindow.xaml / .cs  # 书签编辑窗口
+│   ├── BookmarkDebug.cs # 书签调试工具
 │   └── PdfEditor.csproj # 项目配置
+├── PdfWrapper/          # C++/CLI 包装层（PoDoFo 封装）
+│   ├── PdfWrapper.h / .cpp  # 包装层实现
+│   └── PdfWrapper.vcxproj   # C++ 项目配置
 ├── publish/             # 自包含发布包
 ├── README.md            # 项目说明
+├── prd.md               # 产品需求文档
+├── session.md           # 开发会话记录
 └── .gitignore           # Git 忽略规则
 ```
 
