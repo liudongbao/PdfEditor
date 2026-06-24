@@ -1086,35 +1086,31 @@ namespace PdfEditor
                         
                         using (var presentationDocument = PresentationDocument.Create(outputPath, PresentationDocumentType.Presentation))
                         {
-                            var presentationPart = presentationDocument.AddPresentationPart();
+                            PresentationPart presentationPart = presentationDocument.AddPresentationPart();
                             presentationPart.Presentation = new P.Presentation();
 
-                            var slideMasterIdList = new P.SlideMasterIdList();
-                            var slideMasterId = new P.SlideMasterId() { Id = 2147483648U };
-                            slideMasterIdList.Append(slideMasterId);
+                            SlideMasterPart slideMasterPart = presentationPart.AddNewPart<SlideMasterPart>("rId1");
+                            CreateSlideMasterPart(slideMasterPart);
 
-                            var slideIdList = new P.SlideIdList();
-                            var slideSize = new P.SlideSize() { Cx = 9144000, Cy = 6858000, Type = P.SlideSizeValues.Screen4x3 };
-                            var notesSize = new P.NotesSize() { Cx = 6858000L, Cy = 9144000L };
+                            SlideLayoutPart slideLayoutPart = slideMasterPart.AddNewPart<SlideLayoutPart>("rId1");
+                            CreateSlideLayoutPart(slideLayoutPart);
 
-                            presentationPart.Presentation.Append(slideMasterIdList);
-                            presentationPart.Presentation.Append(slideIdList);
-                            presentationPart.Presentation.Append(slideSize);
-                            presentationPart.Presentation.Append(notesSize);
+                            ThemePart themePart = slideMasterPart.AddNewPart<ThemePart>("rId2");
+                            CreateThemePart(themePart);
 
-                            var slideMasterPart = presentationPart.AddNewPart<SlideMasterPart>("rId1");
-                            GenerateSlideMasterPartContent(slideMasterPart);
-
-                            var themePart = slideMasterPart.AddNewPart<ThemePart>("rId2");
-                            GenerateThemePartContent(themePart);
-
-                            var slideLayoutPart = slideMasterPart.AddNewPart<SlideLayoutPart>("rId1");
-                            GenerateSlideLayoutPartContent(slideLayoutPart);
-
+                            P.SlideMasterId slideMasterId = new P.SlideMasterId() { Id = 2147483648U, RelationshipId = presentationPart.GetIdOfPart(slideMasterPart) };
+                            presentationPart.Presentation.SlideMasterIdList = new P.SlideMasterIdList(slideMasterId);
+                            
+                            P.SlideIdList slideIdList = new P.SlideIdList();
+                            presentationPart.Presentation.SlideIdList = slideIdList;
+                            
+                            presentationPart.Presentation.SlideSize = new P.SlideSize() { Cx = 9144000, Cy = 6858000, Type = P.SlideSizeValues.Screen4x3 };
+                            presentationPart.Presentation.NotesSize = new P.NotesSize() { Cx = 6858000L, Cy = 9144000L };
+                            
                             for (int i = 0; i < pageCount; i++)
                             {
-                                int slideNum = i + 1;
-                                var slidePart = presentationPart.AddNewPart<SlidePart>($"rId{slideNum + 10}");
+                                SlidePart slidePart = presentationPart.AddNewPart<SlidePart>();
+                                slidePart.AddPart(slideLayoutPart);
 
                                 FpdfPageT page = fpdfview.FPDF_LoadPage(doc, i);
                                 if (page != null)
@@ -1136,15 +1132,17 @@ namespace PdfEditor
 
                                         using (var bmp = new System.Drawing.Bitmap(renderWidth, renderHeight, stride, System.Drawing.Imaging.PixelFormat.Format32bppArgb, buffer))
                                         {
+                                            bmp.RotateFlip(System.Drawing.RotateFlipType.RotateNoneFlipY);
+                                            
+                                            ImagePart imagePart = slidePart.AddImagePart(ImagePartType.Png);
                                             using (var ms = new System.IO.MemoryStream())
                                             {
-                                                bmp.RotateFlip(System.Drawing.RotateFlipType.Rotate180FlipX);
                                                 bmp.Save(ms, System.Drawing.Imaging.ImageFormat.Png);
                                                 ms.Position = 0;
-
-                                                var imagePart = slidePart.AddNewPart<ImagePart>("image/png", $"rId2");
                                                 imagePart.FeedData(ms);
                                             }
+                                            
+                                            CreateSlidePart(slidePart, slidePart.GetIdOfPart(imagePart), i + 1);
                                         }
                                     }
                                     finally
@@ -1153,12 +1151,8 @@ namespace PdfEditor
                                     }
                                 }
 
-                                GenerateSlidePartContent(slidePart, slideNum);
-
-                                slidePart.AddPart(slideLayoutPart, "rId1");
-
-                                var newSlideId = new P.SlideId() { Id = (uint)(255 + slideNum), RelationshipId = presentationPart.GetIdOfPart(slidePart) };
-                                slideIdList.Append(newSlideId);
+                                P.SlideId slideId = new P.SlideId() { Id = (uint)(256 + i), RelationshipId = presentationPart.GetIdOfPart(slidePart) };
+                                slideIdList.Append(slideId);
                             }
 
                             presentationPart.Presentation.Save();
@@ -1181,10 +1175,10 @@ namespace PdfEditor
                 MessageBox.Show($"PowerPoint 导出失败: {ex.Message}\n{ex.StackTrace}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
-
-        private static void GenerateSlideMasterPartContent(SlideMasterPart slideMasterPart)
+        
+        private static void CreateSlideMasterPart(SlideMasterPart slideMasterPart)
         {
-            var slideMaster = new P.SlideMaster(
+            P.SlideMaster slideMaster = new P.SlideMaster(
                 new P.CommonSlideData(
                     new P.ShapeTree(
                         new P.NonVisualGroupShapeProperties(
@@ -1217,10 +1211,10 @@ namespace PdfEditor
 
             slideMasterPart.SlideMaster = slideMaster;
         }
-
-        private static void GenerateSlideLayoutPartContent(SlideLayoutPart slideLayoutPart)
+        
+        private static void CreateSlideLayoutPart(SlideLayoutPart slideLayoutPart)
         {
-            var slideLayout = new P.SlideLayout(
+            P.SlideLayout slideLayout = new P.SlideLayout(
                 new P.CommonSlideData(
                     new P.ShapeTree(
                         new P.NonVisualGroupShapeProperties(
@@ -1240,63 +1234,59 @@ namespace PdfEditor
 
             slideLayoutPart.SlideLayout = slideLayout;
         }
-
-        private static void GenerateThemePartContent(ThemePart themePart)
+        
+        private static void CreateThemePart(ThemePart themePart)
         {
-            var theme = new D.Theme(
-                new D.ThemeElements(
-                    new D.ColorScheme(
-                        new D.Dark1Color(new D.SystemColor() { Val = D.SystemColorValues.WindowText, LastColor = "000000" }),
-                        new D.Light1Color(new D.SystemColor() { Val = D.SystemColorValues.Window, LastColor = "FFFFFF" }),
-                        new D.Dark2Color(new D.RgbColorModelHex() { Val = "1F497D" }),
-                        new D.Light2Color(new D.RgbColorModelHex() { Val = "EEECE1" }),
-                        new D.Accent1Color(new D.RgbColorModelHex() { Val = "4F81BD" }),
-                        new D.Accent2Color(new D.RgbColorModelHex() { Val = "C0504D" }),
-                        new D.Accent3Color(new D.RgbColorModelHex() { Val = "9BBB59" }),
-                        new D.Accent4Color(new D.RgbColorModelHex() { Val = "8064A2" }),
-                        new D.Accent5Color(new D.RgbColorModelHex() { Val = "4BACC6" }),
-                        new D.Accent6Color(new D.RgbColorModelHex() { Val = "F79646" }),
-                        new D.Hyperlink(new D.RgbColorModelHex() { Val = "0000FF" }),
-                        new D.FollowedHyperlinkColor(new D.RgbColorModelHex() { Val = "800080" }))
-                    { Name = "Office" },
-                    new D.FontScheme(
-                        new D.MajorFont(
-                            new D.LatinFont() { Typeface = "Calibri" }),
-                        new D.MinorFont(
-                            new D.LatinFont() { Typeface = "Calibri" }))
-                    { Name = "Office" },
-                    new D.FormatScheme(
-                        new D.FillStyleList(
-                            new D.NoFill(),
-                            new D.SolidFill(new D.SchemeColor() { Val = D.SchemeColorValues.PhColor }),
-                            new D.GradientFill(
-                                new D.GradientStopList(
-                                    new D.GradientStop(new D.SchemeColor() { Val = D.SchemeColorValues.PhColor }) { Position = 0 }),
-                                new D.LinearGradientFill() { Angle = 16200000, Scaled = true })),
-                        new D.LineStyleList(
-                            new D.Outline(new D.NoFill(), new D.PresetDash() { Val = D.PresetLineDashValues.Solid }) { Width = 9525, CapType = D.LineCapValues.Flat, CompoundLineType = D.CompoundLineValues.Single, Alignment = D.PenAlignmentValues.Center },
-                            new D.Outline(new D.SolidFill(new D.SchemeColor() { Val = D.SchemeColorValues.PhColor }), new D.PresetDash() { Val = D.PresetLineDashValues.Solid }) { Width = 9525, CapType = D.LineCapValues.Flat, CompoundLineType = D.CompoundLineValues.Single, Alignment = D.PenAlignmentValues.Center },
-                            new D.Outline(new D.SolidFill(new D.SchemeColor() { Val = D.SchemeColorValues.PhColor }), new D.PresetDash() { Val = D.PresetLineDashValues.Solid }) { Width = 9525, CapType = D.LineCapValues.Flat, CompoundLineType = D.CompoundLineValues.Single, Alignment = D.PenAlignmentValues.Center }),
-                        new D.EffectStyleList(
-                            new D.EffectStyle(new D.EffectList()),
-                            new D.EffectStyle(new D.EffectList()),
-                            new D.EffectStyle(new D.EffectList())),
-                        new D.BackgroundFillStyleList(
-                            new D.NoFill(),
-                            new D.SolidFill(new D.SchemeColor() { Val = D.SchemeColorValues.PhColor }),
-                            new D.GradientFill(
-                                new D.GradientStopList(
-                                    new D.GradientStop(new D.SchemeColor() { Val = D.SchemeColorValues.PhColor }) { Position = 0 }),
-                                new D.LinearGradientFill() { Angle = 16200000, Scaled = true })))
-                    { Name = "Office" }))
-            { Name = "Office Theme" };
+            D.Theme theme = new D.Theme() { Name = "Office Theme" };
+            
+            D.ThemeElements themeElements = new D.ThemeElements();
+            
+            D.ColorScheme colorScheme = new D.ColorScheme() { Name = "Office" };
+            colorScheme.Append(new D.Dark1Color(new D.SystemColor() { Val = D.SystemColorValues.WindowText, LastColor = "000000" }));
+            colorScheme.Append(new D.Light1Color(new D.SystemColor() { Val = D.SystemColorValues.Window, LastColor = "FFFFFF" }));
+            colorScheme.Append(new D.Dark2Color(new D.RgbColorModelHex() { Val = "1F497D" }));
+            colorScheme.Append(new D.Light2Color(new D.RgbColorModelHex() { Val = "EEECE1" }));
+            colorScheme.Append(new D.Accent1Color(new D.RgbColorModelHex() { Val = "4F81BD" }));
+            colorScheme.Append(new D.Accent2Color(new D.RgbColorModelHex() { Val = "C0504D" }));
+            colorScheme.Append(new D.Accent3Color(new D.RgbColorModelHex() { Val = "9BBB59" }));
+            colorScheme.Append(new D.Accent4Color(new D.RgbColorModelHex() { Val = "8064A2" }));
+            colorScheme.Append(new D.Accent5Color(new D.RgbColorModelHex() { Val = "4BACC6" }));
+            colorScheme.Append(new D.Accent6Color(new D.RgbColorModelHex() { Val = "F79646" }));
+            colorScheme.Append(new D.Hyperlink(new D.RgbColorModelHex() { Val = "0000FF" }));
+            colorScheme.Append(new D.FollowedHyperlinkColor(new D.RgbColorModelHex() { Val = "800080" }));
+            
+            D.FontScheme fontScheme = new D.FontScheme() { Name = "Office" };
+            fontScheme.Append(new D.MajorFont(new D.LatinFont() { Typeface = "Calibri" }));
+            fontScheme.Append(new D.MinorFont(new D.LatinFont() { Typeface = "Calibri" }));
+            
+            D.FormatScheme formatScheme = new D.FormatScheme() { Name = "Office" };
+            D.FillStyleList fillStyleList = new D.FillStyleList();
+            fillStyleList.Append(new D.NoFill());
+            fillStyleList.Append(new D.SolidFill(new D.SchemeColor() { Val = D.SchemeColorValues.PhColor }));
+            formatScheme.Append(fillStyleList);
+            
+            D.LineStyleList lineStyleList = new D.LineStyleList();
+            lineStyleList.Append(new D.Outline(new D.NoFill(), new D.PresetDash() { Val = D.PresetLineDashValues.Solid }) { Width = 9525 });
+            formatScheme.Append(lineStyleList);
+            
+            D.EffectStyleList effectStyleList = new D.EffectStyleList();
+            effectStyleList.Append(new D.EffectStyle(new D.EffectList(), new D.EffectList()));
+            formatScheme.Append(effectStyleList);
+            
+            themeElements.Append(colorScheme);
+            themeElements.Append(fontScheme);
+            themeElements.Append(formatScheme);
+            
+            theme.Append(themeElements);
+            theme.Append(new D.ObjectDefaults());
+            theme.Append(new D.ExtraColorSchemeList());
 
             themePart.Theme = theme;
         }
-
-        private static void GenerateSlidePartContent(SlidePart slidePart, int slideNumber)
+        
+        private static void CreateSlidePart(SlidePart slidePart, string imageRelationshipId, int slideNumber)
         {
-            var slide = new P.Slide(
+            P.Slide slide = new P.Slide(
                 new P.CommonSlideData(
                     new P.ShapeTree(
                         new P.NonVisualGroupShapeProperties(
@@ -1315,7 +1305,7 @@ namespace PdfEditor
                                 new P.NonVisualPictureDrawingProperties(new D.PictureLocks() { NoChangeAspect = true }),
                                 new P.ApplicationNonVisualDrawingProperties()),
                             new P.BlipFill(
-                                new D.Blip() { Embed = "rId2" },
+                                new D.Blip() { Embed = imageRelationshipId },
                                 new D.Stretch(new D.FillRectangle())),
                             new P.ShapeProperties(
                                 new D.Transform2D(
