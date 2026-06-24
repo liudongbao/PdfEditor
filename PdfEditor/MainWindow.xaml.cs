@@ -1187,8 +1187,10 @@ namespace PdfEditor
                                         // 直接从 PDFium 缓冲区创建位图，然后 180 度翻转（同时翻转水平和垂直）
                                         using (var bmp = new System.Drawing.Bitmap(renderWidth, renderHeight, stride, System.Drawing.Imaging.PixelFormat.Format32bppArgb, buffer))
                                         {
-                                            // PDFium 位图是 bottom-up 且可能左右镜像，需要 180 度翻转
+                                            // 顺时针旋转180° + 垂直翻转 + 水平翻转
                                             bmp.RotateFlip(System.Drawing.RotateFlipType.Rotate180FlipNone);
+                                            bmp.RotateFlip(System.Drawing.RotateFlipType.RotateNoneFlipY);
+                                            bmp.RotateFlip(System.Drawing.RotateFlipType.RotateNoneFlipX);
                                             
                                             // 保存为 PNG
                                             ImagePart imagePart = slidePart.AddImagePart(ImagePartType.Png);
