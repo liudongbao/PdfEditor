@@ -1106,8 +1106,17 @@ namespace PdfEditor
                         
                         using (var presentationDocument = PresentationDocument.Create(outputPath, PresentationDocumentType.Presentation))
                         {
+                            // 创建演示文稿部件
                             PresentationPart presentationPart = presentationDocument.AddPresentationPart();
                             presentationPart.Presentation = new P.Presentation();
+                            
+                            // 添加演示文稿属性
+                            PresentationPropertiesPart propPart = presentationPart.AddNewPart<PresentationPropertiesPart>("rIdProp");
+                            propPart.PresentationProperties = new P.PresentationProperties(
+                                new P.WebProperties(),
+                                new P.ShowProperties(),
+                                new P.ColorMostRecentlyUsed()
+                            );
                             
                             // 创建幻灯片母版
                             SlideMasterPart slideMasterPart = presentationPart.AddNewPart<SlideMasterPart>();
@@ -1121,18 +1130,29 @@ namespace PdfEditor
                             SlideLayoutPart slideLayoutPart = slideMasterPart.AddNewPart<SlideLayoutPart>();
                             GenerateSlideLayout(slideLayoutPart);
                             
+                            // 更新布局引用
+                            P.SlideLayoutIdList layoutIdList = new P.SlideLayoutIdList();
+                            layoutIdList.Append(new P.SlideLayoutId() { Id = 2147483649U, RelationshipId = slideMasterPart.GetIdOfPart(slideLayoutPart) });
+                            slideMasterPart.SlideMaster.SlideLayoutIdList = layoutIdList;
+                            
                             // 添加母版引用
-                            P.SlideMasterIdList masterIdList = new P.SlideMasterIdList(
-                                new P.SlideMasterId() { Id = 2147483648U, RelationshipId = presentationPart.GetIdOfPart(slideMasterPart) }
-                            );
+                            P.SlideMasterIdList masterIdList = new P.SlideMasterIdList();
+                            masterIdList.Append(new P.SlideMasterId() { Id = 2147483648U, RelationshipId = presentationPart.GetIdOfPart(slideMasterPart) });
                             presentationPart.Presentation.SlideMasterIdList = masterIdList;
                             
-                            // 设置幻灯片大小 (SlideSize 使用 Int32Value)
+                            // 设置幻灯片大小 (标准 4:3)
                             presentationPart.Presentation.SlideSize = new P.SlideSize() 
                             { 
-                                Cx = (int)slideWidthEmu, 
-                                Cy = (int)slideHeightEmu, 
-                                Type = P.SlideSizeValues.Custom 
+                                Cx = 9144000, 
+                                Cy = 6858000, 
+                                Type = P.SlideSizeValues.Screen4x3 
+                            };
+                            
+                            // 设置备注页大小
+                            presentationPart.Presentation.NotesSize = new P.NotesSize() 
+                            { 
+                                Cx = 6858000, 
+                                Cy = 9144000 
                             };
                             
                             // 创建幻灯片列表
@@ -1164,26 +1184,11 @@ namespace PdfEditor
                                         IntPtr buffer = fpdfview.FPDFBitmapGetBuffer(bitmap);
                                         int stride = fpdfview.FPDFBitmapGetStride(bitmap);
                                         
-                                        // 使用 LockBits 高效翻转图像
-                                        using (var bmp = new System.Drawing.Bitmap(renderWidth, renderHeight, System.Drawing.Imaging.PixelFormat.Format32bppArgb))
+                                        // 直接从 PDFium 缓冲区创建位图，然后 180 度翻转（同时翻转水平和垂直）
+                                        using (var bmp = new System.Drawing.Bitmap(renderWidth, renderHeight, stride, System.Drawing.Imaging.PixelFormat.Format32bppArgb, buffer))
                                         {
-                                            var bmpData = bmp.LockBits(
-                                                new System.Drawing.Rectangle(0, 0, renderWidth, renderHeight),
-                                                System.Drawing.Imaging.ImageLockMode.WriteOnly,
-                                                System.Drawing.Imaging.PixelFormat.Format32bppArgb);
-                                            
-                                            // PDFium 位图是 bottom-up，我们需要翻转 Y 轴
-                                            byte[] rowBuffer = new byte[stride];
-                                            for (int y = 0; y < renderHeight; y++)
-                                            {
-                                                IntPtr srcRow = IntPtr.Add(buffer, y * stride);
-                                                IntPtr destRow = IntPtr.Add(bmpData.Scan0, (renderHeight - 1 - y) * bmpData.Stride);
-                                                // 复制整行像素数据
-                                                Marshal.Copy(srcRow, rowBuffer, 0, stride);
-                                                Marshal.Copy(rowBuffer, 0, destRow, stride);
-                                            }
-                                            
-                                            bmp.UnlockBits(bmpData);
+                                            // PDFium 位图是 bottom-up 且可能左右镜像，需要 180 度翻转
+                                            bmp.RotateFlip(System.Drawing.RotateFlipType.Rotate180FlipNone);
                                             
                                             // 保存为 PNG
                                             ImagePart imagePart = slidePart.AddImagePart(ImagePartType.Png);
@@ -1194,8 +1199,8 @@ namespace PdfEditor
                                                 imagePart.FeedData(ms);
                                             }
                                             
-                                            // 生成幻灯片
-                                            GenerateSlide(slidePart, slidePart.GetIdOfPart(imagePart), slideWidthEmu, slideHeightEmu);
+                                            // 生成幻灯片 (传入PDF页面尺寸，单位: 点)
+                                            GenerateSlide(slidePart, slidePart.GetIdOfPart(imagePart), pageWidth, pageHeight);
                                         }
                                         
                                         fpdfview.FPDFBitmapDestroy(bitmap);
@@ -1331,8 +1336,26 @@ namespace PdfEditor
             part.Theme = theme;
         }
         
-        private static void GenerateSlide(SlidePart part, string imageRid, long slideWidthEmu, long slideHeightEmu)
+        private static void GenerateSlide(SlidePart part, string imageRid, float pdfWidthPts, float pdfHeightPts)
         {
+            // 幻灯片大小 (4:3, 单位 EMU)
+            long slideWidthEmu = 9144000;
+            long slideHeightEmu = 6858000;
+            
+            // PDF 页面大小转为 EMU (1 point = 12700 EMU)
+            long pdfWidthEmu = (long)(pdfWidthPts * 12700);
+            long pdfHeightEmu = (long)(pdfHeightPts * 12700);
+            
+            // 按比例缩放图片以适应幻灯片
+            double scaleX = (double)slideWidthEmu / pdfWidthEmu;
+            double scaleY = (double)slideHeightEmu / pdfHeightEmu;
+            double scale = Math.Min(scaleX, scaleY);
+            
+            long imgWidthEmu = (long)(pdfWidthEmu * scale);
+            long imgHeightEmu = (long)(pdfHeightEmu * scale);
+            long imgX = (slideWidthEmu - imgWidthEmu) / 2;
+            long imgY = (slideHeightEmu - imgHeightEmu) / 2;
+            
             P.Slide slide = new P.Slide(
                 new P.CommonSlideData(
                     new P.ShapeTree(
@@ -1356,8 +1379,8 @@ namespace PdfEditor
                                 new D.Stretch(new D.FillRectangle())),
                             new P.ShapeProperties(
                                 new D.Transform2D(
-                                    new D.Offset() { X = 0L, Y = 0L },
-                                    new D.Extents() { Cx = slideWidthEmu, Cy = slideHeightEmu }),
+                                    new D.Offset() { X = imgX, Y = imgY },
+                                    new D.Extents() { Cx = imgWidthEmu, Cy = imgHeightEmu }),
                                 new D.PresetGeometry(new D.AdjustValueList()) { Preset = D.ShapeTypeValues.Rectangle })))),
                 new P.ColorMapOverride(new D.MasterColorMapping()));
             
