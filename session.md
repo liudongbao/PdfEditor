@@ -259,3 +259,152 @@
 - **C++ 库管理:** vcpkg (podofo:x64-windows)
 - **版本控制:** Git
 - **远程仓库:** https://github.com/liudongbao/PdfEditor.git
+
+---
+
+## 十三、2026-06-24 下午开发记录 - PPT 导出修复与发布包整理
+
+### PPT 导出图片翻转问题修复
+
+#### 问题描述
+- PPT 导出保存的文件无法正常打开
+- 修复后可以打开，但里面的图片内容上下颠倒、左右颠倒
+
+#### 解决方案
+使用 PDFium 渲染 PDF 页面为图片，然后插入 PPTX 中：
+
+```csharp
+// 使用 PDFium 渲染当前页
+FpdfBitmapT bitmap = fpdfview.FPDFBitmapCreateEx(renderWidth, renderHeight, ...);
+fpdfview.FPDF_RenderPageBitmap(bitmap, page, 0, 0, renderWidth, renderHeight, 0, 0);
+
+// 获取渲染缓冲区并创建 Bitmap
+using (var bmp = new System.Drawing.Bitmap(...))
+{
+    // 旋转和翻转修复
+    bmp.RotateFlip(RotateFlipType.Rotate180FlipNone);  // 顺时针旋转180°
+    bmp.RotateFlip(RotateFlipType.RotateNoneFlipY);    // 垂直翻转
+    bmp.RotateFlip(RotateFlipType.RotateNoneFlipX);    // 水平翻转
+    
+    // 保存为 PNG 并插入幻灯片
+    imagePart.FeedData(ms);
+}
+```
+
+#### 修复效果
+- ✅ PPT 文件可以正常打开（无需修复）
+- ✅ 图片内容显示正确（上下左右方向正确）
+- ✅ 每页 PDF 对应一页幻灯片
+
+### 单文件发布尝试
+
+#### 尝试方案
+使用 .NET 的 PublishSingleFile 功能，将所有依赖打包到单个 exe 文件中：
+
+```xml
+<PropertyGroup>
+  <PublishSingleFile>true</PublishSingleFile>
+  <SelfContained>true</SelfContained>
+  <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+  <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
+  <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+</PropertyGroup>
+```
+
+#### 遇到的问题
+- 单文件发布后部分功能不可用（PDF 预览、书签功能等）
+- PdfWrapper 是 C++/CLI 混合程序集，单文件打包机制无法正确处理
+- WebView2、PDFium 等原生库的嵌入和提取需要额外处理
+
+#### 结论
+- 单文件发布方案暂时搁置，功能不完整
+- 继续使用完整的 publish 目录发布包
+
+### 版本回退
+
+#### 回退操作
+```bash
+git reset --hard da06564d8a92e28be82a4709897baaa612410d1c
+git push --force
+```
+
+#### 回退原因
+- 单文件发布尝试引入了问题
+- 需要恢复到稳定的可工作版本
+
+#### 回退结果
+- ✅ 代码恢复到 PPT 导出修复后的稳定版本
+- ✅ publish 目录完全恢复
+- ✅ 所有功能正常工作
+
+### 发布包整理
+
+#### 发布内容
+1. **完整发布包**: `PdfEditor_v1.0.0.zip`（约 86 MB）
+   - 包含完整的 publish 目录所有文件
+   - 无需安装任何运行时
+   - 解压即用
+
+2. **开发发布包**: `publish/PdfEditor.exe`
+   - 源代码编译后的完整输出
+   - 包含所有依赖 DLL
+
+#### 文件清单
+- PdfEditor.exe - 主程序
+- PdfEditor.dll - WPF 程序集
+- PdfWrapper.dll - C++/CLI 包装层
+- podofo.dll - PoDoFo 库
+- pdfium.dll - PDFium 库
+- freetype.dll - FreeType 字体库
+- 以及其他原生依赖库（约 16 个 DLL）
+
+### Git 提交记录
+
+| 提交 | 说明 |
+|------|------|
+| da06564 | feat: PPT导出功能使用PDFium渲染图片，修复图像翻转问题 |
+| 44aa3db | fix: 修复PPT导出图片翻转(180度)和文件损坏问题 |
+
+### 当前稳定版本
+
+- **Commit:** da06564
+- **版本号:** v1.5
+- **发布日期:** 2026-06-24
+- **状态:** ✅ 所有功能正常工作
+
+#### 正常工作功能
+- ✅ PDF 合并
+- ✅ 页面编辑（删除、调整顺序）
+- ✅ 页面预览（WebView2 + PDF.js）
+- ✅ 目录管理（可视化书签编辑）
+- ✅ 书签保存（PoDoFo）
+- ✅ Word 导出
+- ✅ Excel 导出
+- ✅ PPT 导出（PDFium 图片方式）
+
+---
+
+## 十四、附录
+
+### 日志文件位置
+- `C:\Users\Public\Documents\PdfWrapper.log` - PoDoFo 操作日志
+
+### 常见问题排查
+
+#### 1. 打开 PDF 报错 "Unknown error occurred while loading PDF"
+- 检查 podofo.dll 和依赖的原生库是否正确复制到 publish 目录
+- 检查 PDF 文件是否损坏或加密
+
+#### 2. 书签功能不正常
+- 检查日志文件 `C:\Users\Public\Documents\PdfWrapper.log`
+- 确认使用的是正确版本的 publish 目录
+
+#### 3. PPT 导出文件无法打开
+- 当前版本已修复，PPT 文件可以正常打开
+- 图片内容可能需要根据 PDF 原始方向调整旋转/翻转参数
+
+### 相关资源链接
+- PoDoFo: https://podofo.github.io/
+- PDFium: https://pdfium.googlesource.com/pdfium/
+- DocumentFormat.OpenXml: https://github.com/dotnet/Open-XML-SDK
+- EPPlus: https://github.com/JanKallman/EPPlus

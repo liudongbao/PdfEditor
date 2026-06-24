@@ -86,17 +86,33 @@ namespace PdfWrapper
         try
         {
             std::string path = ToUtf8String(filePath);
+            WriteLog("Loading PDF: " + path);
+            
             PoDoFo::PdfMemDocument* doc = new PoDoFo::PdfMemDocument();
+            WriteLog("Created PdfMemDocument");
+            
             doc->Load(path);
+            WriteLog("Loaded PDF successfully");
+            
             m_NativeDoc = doc;
             LoadBookmarks();
+            WriteLog("Loaded bookmarks");
+        }
+        catch (const PoDoFo::PdfError& e)
+        {
+            std::string error = "PoDoFo error: " + std::string(e.what());
+            WriteLog(error);
+            throw gcnew System::Exception(gcnew System::String(error.c_str()));
         }
         catch (const std::exception& e)
         {
-            throw gcnew System::Exception(gcnew System::String(e.what()));
+            std::string error = "std::exception: " + std::string(e.what());
+            WriteLog(error);
+            throw gcnew System::Exception(gcnew System::String(error.c_str()));
         }
         catch (...)
         {
+            WriteLog("Unknown error occurred while loading PDF");
             throw gcnew System::Exception("Unknown error occurred while loading PDF");
         }
     }
